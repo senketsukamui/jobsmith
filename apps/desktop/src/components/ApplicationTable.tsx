@@ -76,75 +76,64 @@ export function ApplicationTable({ applications, statuses }: ApplicationTablePro
     return (
       <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
         <p className="text-lg font-medium">No applications yet</p>
-        <p className="text-sm mt-1">Click "+ New application" to add your first one.</p>
+        <p className="text-sm mt-1">Click "+ New" to add your first one.</p>
       </div>
     )
   }
 
+  const thBase = 'px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide cursor-pointer select-none hover:text-foreground whitespace-nowrap'
+  const thStatic = 'px-3 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide whitespace-nowrap'
+
   return (
-    <div className="overflow-auto rounded-lg border border-border">
-      <table className="w-full text-sm">
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full min-w-[580px] text-sm">
         <thead className="bg-muted/50">
           <tr>
-            {(
-              [
-                ['company', 'Company'],
-                ['role', 'Role'],
-              ] as [SortKey, string][]
-            ).map(([key, label]) => (
-              <th
-                key={key}
-                onClick={() => handleSort(key)}
-                className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground"
-              >
-                {label}
-                <SortIndicator col={key} />
-              </th>
-            ))}
-            <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-            <th
-              onClick={() => handleSort('source')}
-              className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground"
-            >
-              Source
-              <SortIndicator col="source" />
+            <th onClick={() => handleSort('company')} className={thBase}>
+              Company <SortIndicator col="company" />
             </th>
-            {(
-              [
-                ['applied_at', 'Applied'],
-                ['last_activity_at', 'Last activity'],
-              ] as [SortKey, string][]
-            ).map(([key, label]) => (
-              <th
-                key={key}
-                onClick={() => handleSort(key)}
-                className="px-4 py-3 text-left font-medium text-muted-foreground cursor-pointer select-none hover:text-foreground whitespace-nowrap"
-              >
-                {label}
-                <SortIndicator col={key} />
-              </th>
-            ))}
+            <th onClick={() => handleSort('role')} className={thBase}>
+              Role <SortIndicator col="role" />
+            </th>
+            <th className={thStatic}>Status</th>
+            <th onClick={() => handleSort('source')} className={thBase}>
+              Source <SortIndicator col="source" />
+            </th>
+            <th onClick={() => handleSort('applied_at')} className={thBase}>
+              Applied <SortIndicator col="applied_at" />
+            </th>
+            <th onClick={() => handleSort('last_activity_at')} className={thBase}>
+              Last activity <SortIndicator col="last_activity_at" />
+            </th>
           </tr>
         </thead>
         <tbody className="divide-y divide-border">
           {sorted.map((app) => (
             <tr key={app.id} className="hover:bg-muted/30 transition-colors">
-              <td className="px-4 py-3 font-medium">{app.company.name}</td>
-              <td className="px-4 py-3 text-muted-foreground">{app.role_title}</td>
-              <td className="px-4 py-3">
+              <td className="px-3 py-2.5 font-medium max-w-[180px]">
+                <span className="block truncate" title={app.company.name}>
+                  {app.company.name}
+                </span>
+              </td>
+              <td className="px-3 py-2.5 text-muted-foreground max-w-[220px]">
+                <span className="block truncate" title={app.role_title}>
+                  {app.role_title}
+                </span>
+              </td>
+              <td className="px-3 py-2.5">
                 <StatusSelect
                   applicationId={app.id}
                   currentStatus={app.status}
                   statuses={statuses}
                 />
               </td>
-              <td className="px-4 py-3 text-muted-foreground">
+              <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                 {SOURCE_LABELS[app.source] ?? app.source}
               </td>
-              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+              <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                 {formatDate(app.applied_at)}
               </td>
-              <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+              <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                 {formatDate(app.last_activity_at)}
               </td>
             </tr>
