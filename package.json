@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "scripts": {
     "dev": "pnpm --filter @job-tracker/desktop dev",
-    "build": "pnpm --filter @job-tracker/desktop build",
+    "dev:extension": "pnpm --filter @job-tracker/extension dev",
+    "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @job-tracker/desktop db:generate",

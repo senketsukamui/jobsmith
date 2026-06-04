@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc'
+import { cn } from '@/lib/utils'
 
 function OllamaSection() {
   const queryClient = useQueryClient()
@@ -241,6 +242,73 @@ function CvsSection() {
   )
 }
 
+function PairingSection() {
+  const queryClient = useQueryClient()
+  const tokenQuery = trpc.settings.getPairingToken.useQuery()
+  const rotateMutation = trpc.settings.rotatePairingToken.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+  const [copied, setCopied] = useState(false)
+
+  const token = tokenQuery.data ?? ''
+
+  function handleCopy() {
+    navigator.clipboard.writeText(token)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Chrome extension pairing</h2>
+
+      <p className="text-sm text-muted-foreground">
+        Install the companion extension, then paste this token in the extension popup to pair it with the desktop app.
+      </p>
+
+      <div className="space-y-1.5">
+        <label className="text-sm font-medium">Bearer token</label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            readOnly
+            value={tokenQuery.isLoading ? '…' : token}
+            className="flex-1 h-9 rounded-md border border-input bg-muted px-3 text-sm font-mono text-muted-foreground focus-visible:outline-none"
+          />
+          <button
+            type="button"
+            onClick={handleCopy}
+            disabled={!token}
+            className={cn(
+              'h-9 inline-flex items-center justify-center rounded-md border px-3 text-sm transition-colors',
+              copied
+                ? 'border-green-500 text-green-600 bg-green-50'
+                : 'border-input hover:bg-accent'
+            )}
+          >
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Rotate the token? The extension will need to be re-paired.')) {
+                rotateMutation.mutate()
+              }
+            }}
+            disabled={rotateMutation.isLoading}
+            className="h-9 inline-flex items-center justify-center rounded-md border border-input px-3 text-sm hover:bg-accent disabled:opacity-50 transition-colors"
+          >
+            Rotate
+          </button>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          The desktop app runs a local HTTP server on 127.0.0.1 for the extension to communicate with.
+        </p>
+      </div>
+    </section>
+  )
+}
+
 export function SettingsPage() {
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -250,6 +318,7 @@ export function SettingsPage() {
       <div className="flex-1 px-6 py-6 space-y-10 max-w-2xl">
         <OllamaSection />
         <CvsSection />
+        <PairingSection />
       </div>
     </div>
   )

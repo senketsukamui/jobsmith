@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Job Tracker</title>
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      body {
+        width: 360px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        font-size: 13px;
+        color: #1a1a1a;
+        background: #fff;
+      }
+
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 14px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+      .header h1 { font-size: 14px; font-weight: 600; }
+      .header-badge {
+        font-size: 11px;
+        padding: 2px 7px;
+        border-radius: 999px;
+        background: #f3f4f6;
+        color: #6b7280;
+      }
+      .header-badge.connected { background: #dcfce7; color: #16a34a; }
+
+      .section { padding: 12px 14px; }
+      .section + .section { border-top: 1px solid #e5e7eb; }
+
+      /* Pairing view */
+      #pairing-view { display: none; }
+      #pairing-view.visible { display: block; }
+      #main-view { display: block; }
+      #main-view.hidden { display: none; }
+
+      label {
+        display: block;
+        font-size: 11px;
+        font-weight: 500;
+        color: #6b7280;
+        margin-bottom: 4px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      input, textarea, select {
+        width: 100%;
+        padding: 6px 8px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 13px;
+        font-family: inherit;
+        color: #111827;
+        background: #fff;
+        outline: none;
+        transition: border-color .15s;
+      }
+      input:focus, textarea:focus, select:focus { border-color: #6366f1; }
+      textarea { resize: vertical; min-height: 80px; max-height: 160px; }
+
+      .field { margin-bottom: 10px; }
+      .field:last-child { margin-bottom: 0; }
+
+      .row { display: flex; gap: 8px; }
+      .row .field { flex: 1; }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 14px;
+        border-radius: 6px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        border: none;
+        transition: opacity .15s, background .15s;
+      }
+      .btn:disabled { opacity: .5; cursor: default; }
+      .btn-primary { background: #4f46e5; color: #fff; }
+      .btn-primary:hover:not(:disabled) { background: #4338ca; }
+      .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #374151; }
+      .btn-outline:hover:not(:disabled) { background: #f9fafb; }
+
+      .footer {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 10px 14px;
+        border-top: 1px solid #e5e7eb;
+      }
+
+      #status-msg {
+        font-size: 12px;
+        min-height: 16px;
+      }
+      #status-msg.success { color: #16a34a; }
+      #status-msg.error { color: #dc2626; }
+
+      .copy-fallback { margin-top: 8px; }
+      .copy-fallback textarea { font-family: monospace; font-size: 11px; height: 60px; }
+
+      .token-input-wrap { display: flex; gap: 6px; }
+      .token-input-wrap input { flex: 1; font-family: monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Job Tracker</h1>
+      <span id="connection-badge" class="header-badge">Not connected</span>
+    </div>
+
+    <!-- Pairing view (shown when not paired) -->
+    <div id="pairing-view" class="section">
+      <div class="field">
+        <label>Paste bearer token from the desktop app Settings → "Pair extension"</label>
+        <div class="token-input-wrap">
+          <input type="text" id="token-input" placeholder="e.g. xYzAbC…" autocomplete="off" />
+          <button class="btn btn-primary" id="pair-btn">Pair</button>
+        </div>
+      </div>
+      <p id="pair-error" style="color:#dc2626;font-size:12px;margin-top:6px;"></p>
+    </div>
+
+    <!-- Main view (shown when paired) -->
+    <div id="main-view" class="hidden">
+      <div class="section">
+        <div class="field">
+          <label>Company</label>
+          <input type="text" id="company" placeholder="Stripe" />
+        </div>
+        <div class="field">
+          <label>Role</label>
+          <input type="text" id="role" placeholder="Senior Frontend Engineer" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Source</label>
+            <select id="source">
+              <option value="linkedin">LinkedIn</option>
+              <option value="lever">Lever</option>
+              <option value="greenhouse">Greenhouse</option>
+              <option value="manual" selected>Manual</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Applied date</label>
+            <input type="date" id="applied-at" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Job URL</label>
+          <input type="url" id="job-url" />
+        </div>
+        <div class="field">
+          <label>Job description</label>
+          <textarea id="job-description" placeholder="Paste or extracted from page…"></textarea>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span id="status-msg"></span>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-outline" id="unpair-btn">Unpair</button>
+          <button class="btn btn-primary" id="submit-btn">Save to tracker</button>
+        </div>
+      </div>
+
+      <div id="copy-fallback" class="copy-fallback section" style="display:none">
+        <label>Copy as JSON (paste manually)</label>
+        <textarea id="copy-json" readonly></textarea>
+        <button class="btn btn-outline" style="margin-top:6px;width:100%" id="copy-btn">Copy JSON</button>
+      </div>
+    </div>
+
+    <script type="module" src="../src/popup/main.ts"></script>
+  </body>
+</html>

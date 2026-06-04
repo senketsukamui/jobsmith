@@ -1,4 +1,7 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, shell, Tray, Menu, nativeImage } from 'electron'
+
+// Module-level quit flag so tray close handler can distinguish hide vs quit
+let isQuitting = false
 import { createIPCHandler } from 'electron-trpc/main'
 import path from 'path'
 import pino from 'pino'
@@ -6,6 +9,8 @@ import fs from 'fs'
 import { initClient } from './db/client'
 import { runMigrations } from './db/migrate'
 import { appRouter } from './ipc/router'
+import { startHttpServer } from './services/httpServer'
+import { getOrCreatePairingToken } from './services/pairing'
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
 
@@ -62,8 +67,63 @@ function createWindow() {
     return { action: 'deny' }
   })
 
+  win.on('close', (e) => {
+    // On macOS, close hides to tray rather than quitting
+    if (process.platform === 'darwin' && !isQuitting) {
+      e.preventDefault()
+      win?.hide()
+    }
+  })
+
   win.on('closed', () => {
     win = null
+  })
+}
+
+// ─── Tray ─────────────────────────────────────────────────────────────────────
+
+let tray: Tray | null = null
+
+function createTray() {
+  const iconPath = app.isPackaged
+    ? path.join(process.resourcesPath, 'tray-icon.png')
+    : path.join(__dirname, '../assets/tray-icon.png')
+
+  const icon = fs.existsSync(iconPath)
+    ? nativeImage.createFromPath(iconPath).resize({ width: 16, height: 16 })
+    : nativeImage.createEmpty()
+
+  tray = new Tray(icon)
+  tray.setToolTip('Job Tracker')
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: 'Open Job Tracker',
+      click: () => {
+        if (win) {
+          win.show()
+        } else {
+          createWindow()
+        }
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true
+        app.quit()
+      },
+    },
+  ])
+
+  tray.setContextMenu(menu)
+  tray.on('double-click', () => {
+    if (win) {
+      win.show()
+    } else {
+      createWindow()
+    }
   })
 }
 
@@ -81,13 +141,34 @@ app.whenReady().then(async () => {
     return
   }
 
+  // Ensure pairing token exists on startup
+  await getOrCreatePairingToken()
+
+  // Start local HTTP server for Chrome extension
+  try {
+    const port = await startHttpServer()
+    logger.info({ port }, 'HTTP server started')
+  } catch (err) {
+    logger.error({ err }, 'Failed to start HTTP server')
+  }
+
   createWindow()
+  createTray()
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (win) {
+      win.show()
+    } else {
+      createWindow()
+    }
   })
 })
 
 app.on('window-all-closed', () => {
+  // On macOS keep running in tray; on other platforms quit
   if (process.platform !== 'darwin') app.quit()
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
 })

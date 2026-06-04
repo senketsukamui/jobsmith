@@ -15,6 +15,7 @@ import * as CvService from '../services/cvs'
 import * as CoverLetterService from '../services/coverLetters'
 import * as OllamaService from '../services/ollama'
 import * as SettingsService from '../services/settings'
+import * as PairingService from '../services/pairing'
 
 const t = initTRPC.create({ isServer: true })
 const router = t.router
@@ -166,6 +167,10 @@ const settingsRouter = router({
   set: procedure
     .input(z.object({ key: z.string(), value: z.string() }))
     .mutation(({ input }) => SettingsService.setSetting(input.key, input.value)),
+
+  getPairingToken: procedure.query(() => PairingService.getOrCreatePairingToken()),
+
+  rotatePairingToken: procedure.mutation(() => PairingService.rotatePairingToken()),
 })
 
 // ─── App router ───────────────────────────────────────────────────────────────
