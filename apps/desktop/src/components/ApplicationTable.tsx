@@ -7,6 +7,8 @@ type SortKey = 'company' | 'role' | 'source' | 'applied_at' | 'last_activity_at'
 interface ApplicationTableProps {
   applications: ApplicationWithRelations[]
   statuses: Status[]
+  selectedId?: string | null
+  onRowClick?: (id: string) => void
 }
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -26,7 +28,7 @@ function formatDate(ts: number | null): string {
   })
 }
 
-export function ApplicationTable({ applications, statuses }: ApplicationTableProps) {
+export function ApplicationTable({ applications, statuses, selectedId, onRowClick }: ApplicationTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('last_activity_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
 
@@ -109,7 +111,11 @@ export function ApplicationTable({ applications, statuses }: ApplicationTablePro
         </thead>
         <tbody className="divide-y divide-border">
           {sorted.map((app) => (
-            <tr key={app.id} className="hover:bg-muted/30 transition-colors">
+            <tr
+              key={app.id}
+              onClick={() => onRowClick?.(app.id)}
+              className={`transition-colors ${onRowClick ? 'cursor-pointer' : ''} ${selectedId === app.id ? 'bg-accent' : 'hover:bg-muted/30'}`}
+            >
               <td className="px-3 py-2.5 font-medium max-w-[180px]">
                 <span className="block truncate" title={app.company.name}>
                   {app.company.name}

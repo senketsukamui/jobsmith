@@ -27,7 +27,11 @@ export function AddApplicationDialog() {
   const [jobUrl, setJobUrl] = useState('')
   const [source, setSource] = useState<ApplicationSource>('manual')
   const [appliedAt, setAppliedAt] = useState(todayISO())
+  const [cvId, setCvId] = useState<string>('')
   const [error, setError] = useState('')
+
+  const cvsQuery = trpc.cvs.list.useQuery()
+  const cvs = cvsQuery.data ?? []
 
   // Company autocomplete
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -52,6 +56,7 @@ export function AddApplicationDialog() {
     setJobUrl('')
     setSource('manual')
     setAppliedAt(todayISO())
+    setCvId('')
     setError('')
     setShowSuggestions(false)
     closeAddDialog()
@@ -77,6 +82,7 @@ export function AddApplicationDialog() {
       job_description: jobDescription.trim() || undefined,
       job_url: jobUrl.trim() || undefined,
       source,
+      cv_id: cvId || undefined,
       applied_at: appliedAt ? new Date(appliedAt).getTime() : undefined,
     })
   }
@@ -199,6 +205,25 @@ export function AddApplicationDialog() {
                 />
               </div>
             </div>
+
+            {/* CV */}
+            {cvs.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">CV</label>
+                <select
+                  value={cvId}
+                  onChange={(e) => setCvId(e.target.value)}
+                  className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <option value="">None</option>
+                  {cvs.map((cv) => (
+                    <option key={cv.id} value={cv.id}>
+                      {cv.name}{cv.is_default ? ' ★' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {/* Job description */}
             <div className="space-y-1.5">
