@@ -242,6 +242,102 @@ function CvsSection() {
   )
 }
 
+function GmailSection() {
+  const queryClient = useQueryClient()
+  const connectedQuery = trpc.gmail.isConnected.useQuery()
+  const settingsQuery = trpc.settings.getAll.useQuery()
+
+  const connectMutation = trpc.gmail.connect.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+  const disconnectMutation = trpc.gmail.disconnect.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+  const setSetting = trpc.settings.set.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+
+  const isConnected = connectedQuery.data ?? false
+  const intervalMinutes = settingsQuery.data?.scan_interval_minutes ?? '30'
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Gmail</h2>
+
+      <div className="flex items-center gap-3">
+        <span className={`inline-block w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-muted-foreground/40'}`} />
+        <span className="text-sm">{isConnected ? 'Connected' : 'Not connected'}</span>
+        {!isConnected ? (
+          <button
+            type="button"
+            onClick={() => connectMutation.mutate()}
+            disabled={connectMutation.isLoading}
+            className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            Connect Gmail
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Disconnect Gmail? This will revoke the OAuth token.')) {
+                disconnectMutation.mutate()
+              }
+            }}
+            disabled={disconnectMutation.isLoading}
+            className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-sm hover:bg-accent disabled:opacity-50 transition-colors"
+          >
+            Disconnect
+          </button>
+        )}
+      </div>
+
+      {!isConnected && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">
+            You need a Google OAuth client ID and secret. Set them as environment variables
+            <code className="mx-1 px-1 py-0.5 bg-muted rounded text-[11px]">GOOGLE_CLIENT_ID</code>
+            and
+            <code className="mx-1 px-1 py-0.5 bg-muted rounded text-[11px]">GOOGLE_CLIENT_SECRET</code>
+            before launching, or store them in settings below.
+          </p>
+          <div className="space-y-2">
+            {(['google_client_id', 'google_client_secret'] as const).map((key) => (
+              <div key={key} className="flex gap-2">
+                <input
+                  type={key === 'google_client_secret' ? 'password' : 'text'}
+                  placeholder={key === 'google_client_id' ? 'Google Client ID' : 'Google Client Secret'}
+                  onBlur={(e) => {
+                    if (e.target.value.trim()) {
+                      setSetting.mutate({ key, value: e.target.value.trim() })
+                    }
+                  }}
+                  className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isConnected && (
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Scan interval (minutes)</label>
+          <select
+            value={intervalMinutes}
+            onChange={(e) => setSetting.mutate({ key: 'scan_interval_minutes', value: e.target.value })}
+            className="h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          >
+            {['10', '15', '30', '60', '120'].map((v) => (
+              <option key={v} value={v}>{v} minutes</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function PairingSection() {
   const queryClient = useQueryClient()
   const tokenQuery = trpc.settings.getPairingToken.useQuery()
@@ -317,6 +413,7 @@ export function SettingsPage() {
       </div>
       <div className="flex-1 px-6 py-6 space-y-10 max-w-2xl">
         <OllamaSection />
+        <GmailSection />
         <CvsSection />
         <PairingSection />
       </div>

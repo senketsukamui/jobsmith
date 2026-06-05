@@ -1,18 +1,25 @@
 import { cn } from '@/lib/utils'
+import { trpc } from '@/lib/trpc'
 
-type Page = 'applications' | 'settings'
+type Page = 'applications' | 'emails' | 'settings'
 
 interface SidebarProps {
   active: Page
   onNavigate: (page: Page) => void
 }
 
-const NAV: { id: Page; label: string; icon: string }[] = [
-  { id: 'applications', label: 'Applications', icon: '📋' },
-  { id: 'settings', label: 'Settings', icon: '⚙️' },
-]
-
 export function Sidebar({ active, onNavigate }: SidebarProps) {
+  const pendingQuery = trpc.emails.pending.useQuery(undefined, {
+    refetchInterval: 60_000,
+  })
+  const pendingCount = (pendingQuery.data ?? []).length
+
+  const NAV: { id: Page; label: string; icon: string; badge?: number }[] = [
+    { id: 'applications', label: 'Applications', icon: '📋' },
+    { id: 'emails', label: 'Emails', icon: '✉️', badge: pendingCount > 0 ? pendingCount : undefined },
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
+  ]
+
   return (
     <aside className="flex flex-col w-44 shrink-0 border-r border-border bg-muted/30 pt-10">
       <nav className="flex flex-col gap-0.5 px-2">
@@ -29,7 +36,12 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             )}
           >
             <span className="text-base leading-none">{item.icon}</span>
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.badge != null && (
+              <span className="inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold min-w-[18px] h-[18px] px-1">
+                {item.badge}
+              </span>
+            )}
           </button>
         ))}
       </nav>

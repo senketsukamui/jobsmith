@@ -16,6 +16,8 @@ import * as CoverLetterService from '../services/coverLetters'
 import * as OllamaService from '../services/ollama'
 import * as SettingsService from '../services/settings'
 import * as PairingService from '../services/pairing'
+import * as GmailService from '../services/gmail'
+import * as EmailScannerService from '../services/emailScanner'
 
 const t = initTRPC.create({ isServer: true })
 const router = t.router
@@ -173,6 +175,38 @@ const settingsRouter = router({
   rotatePairingToken: procedure.mutation(() => PairingService.rotatePairingToken()),
 })
 
+// ─── Gmail ────────────────────────────────────────────────────────────────────
+
+const gmailRouter = router({
+  isConnected: procedure.query(() => GmailService.isConnected()),
+
+  connect: procedure.mutation(() => GmailService.startOAuthFlow()),
+
+  disconnect: procedure.mutation(() => GmailService.disconnect()),
+})
+
+// ─── Emails ───────────────────────────────────────────────────────────────────
+
+const emailsRouter = router({
+  pending: procedure.query(() => EmailScannerService.getPendingEmails()),
+
+  scanNow: procedure.mutation(() => EmailScannerService.scanEmails()),
+
+  accept: procedure.input(z.string()).mutation(({ input }) =>
+    EmailScannerService.acceptEmailSuggestion(input)
+  ),
+
+  dismiss: procedure.input(z.string()).mutation(({ input }) =>
+    EmailScannerService.dismissEmailSuggestion(input)
+  ),
+
+  linkToApplication: procedure
+    .input(z.object({ emailId: z.string(), applicationId: z.string() }))
+    .mutation(({ input }) =>
+      EmailScannerService.linkEmailToApplication(input.emailId, input.applicationId)
+    ),
+})
+
 // ─── App router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -183,6 +217,8 @@ export const appRouter = router({
   coverLetters: coverLettersRouter,
   ollama: ollamaRouter,
   settings: settingsRouter,
+  gmail: gmailRouter,
+  emails: emailsRouter,
 })
 
 export type AppRouter = typeof appRouter

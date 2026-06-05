@@ -133,7 +133,7 @@ export async function updateApplication(
 }
 
 export async function changeStatus(
-  input: ChangeStatusInput
+  input: ChangeStatusInput & { source?: 'manual' | 'email' | 'extension' | 'system' }
 ): Promise<ApplicationWithRelations> {
   const db = getDb()
   const now = Date.now()
@@ -148,7 +148,7 @@ export async function changeStatus(
     application_id: input.id,
     status_id: input.status_id,
     changed_at: now,
-    source: 'manual',
+    source: input.source ?? 'manual',
     note: input.note ?? null,
   })
 

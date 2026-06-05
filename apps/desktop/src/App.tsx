@@ -4,9 +4,10 @@ import { ipcLink } from 'electron-trpc/renderer'
 import { trpc } from '@/lib/trpc'
 import { Sidebar } from '@/components/Sidebar'
 import { ApplicationsPage } from '@/routes/ApplicationsPage'
+import { EmailsPage } from '@/routes/EmailsPage'
 import { SettingsPage } from '@/routes/SettingsPage'
 
-type Page = 'applications' | 'settings'
+type Page = 'applications' | 'emails' | 'settings'
 
 export function App() {
   const [queryClient] = useState(
@@ -21,7 +22,9 @@ export function App() {
         <div className="flex h-screen overflow-hidden">
           <Sidebar active={page} onNavigate={setPage} />
           <main className="flex-1 min-w-0 overflow-hidden">
-            {page === 'applications' ? <ApplicationsPage /> : <SettingsPage />}
+            {page === 'applications' && <ApplicationsPage />}
+            {page === 'emails' && <EmailsPage />}
+            {page === 'settings' && <SettingsPage />}
           </main>
         </div>
       </QueryClientProvider>

@@ -33,10 +33,11 @@ export async function checkConnection(): Promise<{ ok: boolean; error?: string }
 export async function* streamGenerate(
   model: string,
   prompt: string,
-  onToken?: (chunk: string) => void
+  onToken?: (chunk: string) => void,
+  options?: { format?: 'json' }
 ): AsyncGenerator<string> {
   const client = await getClient()
-  const stream = await client.generate({ model, prompt, stream: true })
+  const stream = await client.generate({ model, prompt, stream: true, format: options?.format })
   for await (const chunk of stream) {
     const token = chunk.response
     if (token) {
