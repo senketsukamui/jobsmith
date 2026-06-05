@@ -232,6 +232,8 @@ const emailsRouter = router({
       EmailScannerService.linkEmailToApplication(input.emailId, input.applicationId)
     ),
   syncBadge: procedure.mutation(() => updateBadgeCount()),
+
+  history: procedure.query(() => EmailScannerService.getRecentEmails()),
 })
 
 // ─── App router ───────────────────────────────────────────────────────────────

@@ -168,29 +168,101 @@ function EmailCard({ email, statuses, onDone }: {
   )
 }
 
+function HistoryCard({ email, statuses, apps }: {
+  email: Email
+  statuses: { id: string; name: string; color: string }[]
+  apps: { id: string; company: { name: string }; role_title: string }[]
+}) {
+  const classLabel = email.classification ? CLASSIFICATION_LABELS[email.classification] : '—'
+  const classColor = email.classification ? CLASSIFICATION_COLORS[email.classification] : '#9ca3af'
+  const suggestedStatus = statuses.find((s) => s.id === email.suggested_status_id)
+  const linkedApp = apps.find((a) => a.id === email.linked_application_id)
+  const isAutoApplied = email.user_action === 'accepted'
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4 space-y-2.5 opacity-90">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{email.subject ?? '(no subject)'}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            From: {email.from_name ? `${email.from_name} <${email.from_address}>` : (email.from_address ?? '—')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span
+            className="text-xs font-medium px-2 py-0.5 rounded-full text-white"
+            style={{ backgroundColor: classColor }}
+          >
+            {classLabel}
+          </span>
+          {email.confidence != null && (
+            <span className="text-xs text-muted-foreground">
+              {Math.round(email.confidence * 100)}%
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Meta row */}
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        {linkedApp && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Application:</span>
+            <span className="font-medium">{linkedApp.company.name} — {linkedApp.role_title}</span>
+          </div>
+        )}
+        {suggestedStatus && (
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground">Status:</span>
+            <span
+              className="px-1.5 py-0.5 rounded-full text-white text-[11px] font-medium"
+              style={{ backgroundColor: suggestedStatus.color }}
+            >
+              {suggestedStatus.name}
+            </span>
+          </div>
+        )}
+        {isAutoApplied ? (
+          <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[11px] font-medium border border-green-200">
+            Auto-applied
+          </span>
+        ) : (
+          <span className="text-[11px] text-muted-foreground italic">Dismissed</span>
+        )}
+        <span className="text-[11px] text-muted-foreground ml-auto">
+          {email.processed_at ? new Date(email.processed_at).toLocaleString() : ''}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export function EmailsPage() {
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<'review' | 'history'>('review')
+
   const pendingQuery = trpc.emails.pending.useQuery()
+  const historyQuery = trpc.emails.history.useQuery()
   const statusesQuery = trpc.statuses.list.useQuery()
+  const applicationsQuery = trpc.applications.list.useQuery({})
+
   const scanMutation = trpc.emails.scanNow.useMutation({
     onSuccess: () => queryClient.invalidateQueries(),
   })
 
   const pending = pendingQuery.data ?? []
+  const history = historyQuery.data ?? []
   const statuses = statusesQuery.data ?? []
+  const apps = applicationsQuery.data ?? []
+
+  const scanData = scanMutation.data as { scanned: number; newMatches: number; autoApplied: number } | undefined
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-border shrink-0">
-        <div>
-          <h1 className="text-base font-semibold">Email suggestions</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {pending.length > 0
-              ? `${pending.length} pending ${pending.length === 1 ? 'suggestion' : 'suggestions'}`
-              : 'No pending suggestions'}
-          </p>
-        </div>
+        <h1 className="text-base font-semibold">Emails</h1>
         <button
           type="button"
           onClick={() => scanMutation.mutate()}
@@ -201,36 +273,92 @@ export function EmailsPage() {
         </button>
       </div>
 
-      {/* Scan result */}
-      {scanMutation.isSuccess && (
+      {/* Scan result banner */}
+      {scanMutation.isSuccess && scanData && (
         <div className="px-6 py-2 text-xs text-muted-foreground border-b border-border shrink-0">
-          Scan complete — {(scanMutation.data as { scanned: number; newMatches: number }).scanned} messages checked,{' '}
-          {(scanMutation.data as { scanned: number; newMatches: number }).newMatches} new matches
+          Scan complete — {scanData.scanned} messages checked
+          {scanData.autoApplied > 0 && ` · ${scanData.autoApplied} applied automatically`}
+          {scanData.newMatches > 0 && ` · ${scanData.newMatches} need review`}
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex gap-0 px-6 border-b border-border shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('review')}
+          className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+            activeTab === 'review'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Needs review
+          {pending.length > 0 && (
+            <span className="ml-1.5 inline-flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] w-4 h-4">
+              {pending.length}
+            </span>
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+            activeTab === 'history'
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          History
+        </button>
+      </div>
+
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
-        {pendingQuery.isLoading ? (
-          <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
-            Loading…
-          </div>
-        ) : pending.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
-            <p className="text-lg font-medium">No pending suggestions</p>
-            <p className="text-sm mt-1">Click "Scan now" to check for new email matches.</p>
-          </div>
+        {activeTab === 'review' ? (
+          pendingQuery.isLoading ? (
+            <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
+              Loading…
+            </div>
+          ) : pending.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+              <p className="text-lg font-medium">No pending suggestions</p>
+              <p className="text-sm mt-1">Click "Scan now" to check for new email matches.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-w-2xl">
+              {pending.map((email) => (
+                <EmailCard
+                  key={email.id}
+                  email={email}
+                  statuses={statuses}
+                  onDone={() => queryClient.invalidateQueries()}
+                />
+              ))}
+            </div>
+          )
         ) : (
-          <div className="space-y-3 max-w-2xl">
-            {pending.map((email) => (
-              <EmailCard
-                key={email.id}
-                email={email}
-                statuses={statuses}
-                onDone={() => queryClient.invalidateQueries()}
-              />
-            ))}
-          </div>
+          historyQuery.isLoading ? (
+            <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
+              Loading…
+            </div>
+          ) : history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-24 text-muted-foreground">
+              <p className="text-lg font-medium">No history yet</p>
+              <p className="text-sm mt-1">Auto-applied and dismissed emails will appear here.</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-w-2xl">
+              {history.map((email) => (
+                <HistoryCard
+                  key={email.id}
+                  email={email}
+                  statuses={statuses}
+                  apps={apps}
+                />
+              ))}
+            </div>
+          )
         )}
       </div>
     </div>

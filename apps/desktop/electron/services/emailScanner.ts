@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, inArray, desc } from 'drizzle-orm'
 import fs from 'fs'
 import path from 'path'
 import { uuidv7 } from 'uuidv7'
@@ -11,8 +11,13 @@ import type { EmailClassification } from '@job-tracker/shared'
 
 const PROMPT_PATH = path.join(__dirname, '../services/llm/prompts/email-classification.md')
 
+const AUTO_APPLY_THRESHOLD = 0.65
+
 const CANDIDATE_KEYWORDS = [
-  'application', 'applied', 'thank you for applying', 'thank you for your application',
+  'application', 'applied', 'applying',
+  'thank you for applying', 'thanks for applying',
+  'thank you for your application', 'thanks for your application',
+  'thank you for considering', 'thanks for considering',
   'interview', 'next steps', 'unfortunately', 'we regret', 'not moving forward',
   'position has been filled', 'offer', 'congratulations', 'hiring decision',
   'follow up', 'recruiter', 'talent acquisition',
@@ -71,7 +76,7 @@ async function classifyEmail(params: {
   received_at: string
   body: string
 }): Promise<ClassificationResult | null> {
-  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:7b-instruct'
+  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:3b-instruct'
   const prompt = loadPromptTemplate()
     .replace('{from_name}', params.from_name)
     .replace('{from_address}', params.from_address)
@@ -79,14 +84,18 @@ async function classifyEmail(params: {
     .replace('{received_at}', params.received_at)
     .replace('{body_truncated_to_2000_chars}', params.body.slice(0, 2000))
 
+  console.log(`[emailScanner] classifyEmail: subject="${params.subject}" from="${params.from_address}"`)
   let raw = ''
   try {
     for await (const token of streamGenerate(model, prompt, undefined, { format: 'json' })) {
       raw += token
     }
+    console.log(`[emailScanner] LLM raw output: ${raw.slice(0, 300)}`)
     const parsed = JSON.parse(raw) as ClassificationResult
+    console.log(`[emailScanner] classified as ${parsed.classification} (confidence=${parsed.confidence}, company="${parsed.company_guess}", role="${parsed.role_guess}")`)
     return parsed
-  } catch {
+  } catch (err) {
+    console.error('[emailScanner] classifyEmail error:', err, 'raw:', raw.slice(0, 300))
     return null
   }
 }
@@ -128,6 +137,7 @@ async function findMatchingApplication(
     }
   }
 
+  console.log(`[emailScanner] findMatchingApplication: company="${companyGuess}" role="${roleGuess}" → ${bestId ?? 'no match'} (score=${bestScore})`)
   return bestId
 }
 
@@ -174,10 +184,12 @@ function headerVal(headers: { name?: string | null; value?: string | null }[], n
 export interface ScanResult {
   scanned: number
   newMatches: number
+  autoApplied: number
 }
 
 export async function scanEmails(): Promise<ScanResult> {
   const db = getDb()
+  console.log('[emailScanner] scanEmails started')
   const gmail = await getGmailClient()
 
   // Collect known company domains for candidate filtering
@@ -193,6 +205,8 @@ export async function scanEmails(): Promise<ScanResult> {
   let messageIds: string[] = []
   let newHistoryId: string | undefined
 
+  console.log(`[emailScanner] lastHistoryId=${lastHistoryId}`)
+
   if (lastHistoryId) {
     try {
       const histResp = await gmail.users.history.list({
@@ -206,29 +220,44 @@ export async function scanEmails(): Promise<ScanResult> {
           if (added.message?.id) messageIds.push(added.message.id)
         }
       }
-    } catch {
-      // historyId expired — fall back to recent messages
+      console.log(`[emailScanner] history API returned ${messageIds.length} new message(s), newHistoryId=${newHistoryId}`)
+    } catch (err) {
+      console.warn('[emailScanner] history API failed, will fallback to list:', err)
       messageIds = []
     }
   }
 
   // Fallback: fetch last 50 messages
   if (messageIds.length === 0 && !lastHistoryId) {
+    console.log('[emailScanner] no lastHistoryId, fetching last 50 messages')
     const listResp = await gmail.users.messages.list({ userId: 'me', maxResults: 50 })
     messageIds = (listResp.data.messages ?? []).map((m) => m.id ?? '').filter(Boolean)
-    newHistoryId = listResp.data.nextPageToken ? undefined : undefined
     // Capture profile historyId for future delta queries
     const profile = await gmail.users.getProfile({ userId: 'me' })
     newHistoryId = profile.data.historyId ?? undefined
+    console.log(`[emailScanner] fetched ${messageIds.length} messages, newHistoryId=${newHistoryId}`)
+  }
+
+  // Also fallback when history expired (got 0 from history but had a lastHistoryId)
+  if (messageIds.length === 0 && lastHistoryId) {
+    console.log('[emailScanner] history returned 0 messages (may be up-to-date or expired), fetching last 50 as fallback')
+    const listResp = await gmail.users.messages.list({ userId: 'me', maxResults: 50 })
+    messageIds = (listResp.data.messages ?? []).map((m) => m.id ?? '').filter(Boolean)
+    const profile = await gmail.users.getProfile({ userId: 'me' })
+    newHistoryId = profile.data.historyId ?? undefined
+    console.log(`[emailScanner] fallback fetched ${messageIds.length} messages`)
   }
 
   let scanned = 0
   let newMatches = 0
+  let autoApplied = 0
 
   // Deduplicate against already-seen messages
   const existingIds = new Set(
     (await db.select({ gid: emails.gmail_message_id }).from(emails)).map((r) => r.gid)
   )
+
+  console.log(`[emailScanner] processing ${messageIds.length} messages (${existingIds.size} already seen)`)
 
   for (const msgId of messageIds) {
     if (existingIds.has(msgId)) continue
@@ -258,12 +287,17 @@ export async function scanEmails(): Promise<ScanResult> {
         snippet: msg.snippet ?? '',
         body: extractBody(msg.payload ?? {}),
       }
-    } catch { continue }
+    } catch (err) {
+      console.warn(`[emailScanner] failed to fetch message ${msgId}:`, err)
+      continue
+    }
 
     scanned++
     const fromDomain = raw.fromAddress.split('@')[1] ?? ''
+    const candidate = isCandidate(raw.subject, raw.snippet, fromDomain, companyDomains)
+    console.log(`[emailScanner] msg ${msgId}: subject="${raw.subject}" from="${raw.fromAddress}" candidate=${candidate}`)
 
-    if (!isCandidate(raw.subject, raw.snippet, fromDomain, companyDomains)) continue
+    if (!candidate) continue
 
     // Run LLM classification
     const classification = await classifyEmail({
@@ -274,7 +308,15 @@ export async function scanEmails(): Promise<ScanResult> {
       body: raw.body || raw.snippet,
     })
 
-    if (!classification || classification.classification === 'unrelated') continue
+    if (!classification) {
+      console.warn(`[emailScanner] classification failed for msg ${msgId}, skipping`)
+      continue
+    }
+
+    if (classification.classification === 'unrelated') {
+      console.log(`[emailScanner] msg ${msgId} classified as unrelated, skipping`)
+      continue
+    }
 
     // Fuzzy-match to an application
     const linkedAppId = await findMatchingApplication(
@@ -284,12 +326,12 @@ export async function scanEmails(): Promise<ScanResult> {
 
     // Find matching status for suggestion
     let suggestedStatusId: string | null = null
-    if (classification.confidence >= 0.6) {
+    if (classification.confidence >= 0.5) {
       const statusMap: Record<string, string[]> = {
-        rejection: ['rejected', 'rejection'],
+        rejection:        ['rejected', 'rejection'],
         interview_invite: ['hr interview', 'tech interview', 'interview'],
-        offer: ['offer'],
-        acknowledgment: ['applied', 'acknowledged'],
+        offer:            ['offer'],
+        acknowledgment:   ['acknowledged'],
       }
       const keywords = statusMap[classification.classification] ?? []
       if (keywords.length > 0) {
@@ -298,7 +340,29 @@ export async function scanEmails(): Promise<ScanResult> {
           keywords.some((kw) => s.name.toLowerCase().includes(kw))
         )
         suggestedStatusId = match?.id ?? null
+        console.log(`[emailScanner] suggestedStatusId=${suggestedStatusId} (looked for: ${keywords.join(', ')})`)
       }
+    }
+
+    const canAutoApply = !!(linkedAppId && suggestedStatusId && classification.confidence >= AUTO_APPLY_THRESHOLD)
+    console.log(`[emailScanner] canAutoApply=${canAutoApply} (linkedAppId=${linkedAppId}, suggestedStatusId=${suggestedStatusId}, confidence=${classification.confidence})`)
+
+    if (canAutoApply) {
+      try {
+        const { changeStatus } = await import('./applications')
+        await changeStatus({
+          id: linkedAppId!,
+          status_id: suggestedStatusId!,
+          note: `Auto-applied from email: ${raw.subject}`,
+          source: 'email',
+        })
+        console.log(`[emailScanner] auto-applied status change for app ${linkedAppId}`)
+        autoApplied++
+      } catch (err) {
+        console.error('[emailScanner] auto-apply changeStatus failed:', err)
+      }
+    } else {
+      newMatches++
     }
 
     const now = Date.now()
@@ -316,19 +380,19 @@ export async function scanEmails(): Promise<ScanResult> {
       suggested_status_id: suggestedStatusId,
       linked_application_id: linkedAppId,
       linked_company_id: null,
-      user_action: 'pending',
+      user_action: canAutoApply ? 'accepted' : 'pending',
       raw_llm_output: JSON.stringify(classification),
       processed_at: now,
     })
-
-    newMatches++
   }
 
   if (newHistoryId) {
     await setLastHistoryId(newHistoryId)
+    console.log(`[emailScanner] saved newHistoryId=${newHistoryId}`)
   }
 
-  return { scanned, newMatches }
+  console.log(`[emailScanner] done: scanned=${scanned} autoApplied=${autoApplied} newMatches=${newMatches}`)
+  return { scanned, newMatches, autoApplied }
 }
 
 export async function getPendingEmails() {
@@ -337,6 +401,16 @@ export async function getPendingEmails() {
     .select()
     .from(emails)
     .where(eq(emails.user_action, 'pending'))
+}
+
+export async function getRecentEmails(limit = 50) {
+  const db = getDb()
+  return db
+    .select()
+    .from(emails)
+    .where(inArray(emails.user_action, ['accepted', 'dismissed']))
+    .orderBy(desc(emails.processed_at))
+    .limit(limit)
 }
 
 export async function acceptEmailSuggestion(id: string): Promise<void> {

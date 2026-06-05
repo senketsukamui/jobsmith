@@ -19,14 +19,14 @@ export async function startScheduler(): Promise<void> {
     try {
       if (!(await isConnected())) return
       const result = await scanEmails()
-      if (result.newMatches > 0) {
-        const notifEnabled = (await getSetting('notification_enabled')) !== '0'
-        if (notifEnabled) {
-          notify(
-            'Job Tracker',
-            `${result.newMatches} new email match${result.newMatches > 1 ? 'es' : ''} found.`
-          )
-        }
+      const notifEnabled = (await getSetting('notification_enabled')) !== '0'
+      if (notifEnabled && (result.autoApplied > 0 || result.newMatches > 0)) {
+        const msg: string[] = []
+        if (result.autoApplied > 0)
+          msg.push(`${result.autoApplied} status update${result.autoApplied > 1 ? 's' : ''} applied automatically`)
+        if (result.newMatches > 0)
+          msg.push(`${result.newMatches} email${result.newMatches > 1 ? 's' : ''} need review`)
+        notify('Job Tracker', msg.join(' · '))
       }
       await updateBadgeCount()
     } catch { /* errors logged elsewhere */ }
