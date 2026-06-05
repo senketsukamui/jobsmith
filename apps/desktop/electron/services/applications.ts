@@ -246,7 +246,7 @@ export async function parseApplicationMarkdown(
   if (!app) throw new Error('Application not found')
   if (!app.page_markdown) throw new Error('No page clipping stored for this application')
 
-  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:7b-instruct'
+  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:3b-instruct'
   const prompt = loadParsePrompt().replace('{page_markdown}', app.page_markdown.slice(0, 8000))
 
   let raw = ''

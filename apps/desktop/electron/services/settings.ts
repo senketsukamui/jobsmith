@@ -4,7 +4,7 @@ import { settings } from '../db/schema'
 
 export const DEFAULTS: Record<string, string> = {
   ollama_host: 'http://localhost:11434',
-  ollama_model: 'qwen2.5:7b-instruct',
+  ollama_model: 'qwen2.5:3b-instruct',
 }
 
 export async function getSetting(key: string): Promise<string | null> {

@@ -68,7 +68,7 @@ export async function* generateCoverLetter(input: {
 
   const cvText = cvId ? await getCvText(cvId) : null
 
-  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:7b-instruct'
+  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:3b-instruct'
   const prompt = buildPrompt({
     cv_extracted_text: cvText ?? '(no CV provided)',
     company_name: appRow.company.name,
