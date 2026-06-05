@@ -64,7 +64,6 @@
         transition: border-color .15s;
       }
       input:focus, textarea:focus, select:focus { border-color: #6366f1; }
-      textarea { resize: vertical; min-height: 80px; max-height: 160px; }
 
       .field { margin-bottom: 10px; }
       .field:last-child { margin-bottom: 0; }
@@ -111,6 +110,42 @@
 
       .token-input-wrap { display: flex; gap: 6px; }
       .token-input-wrap input { flex: 1; font-family: monospace; }
+
+      /* Clipping preview */
+      .clip-section { padding: 10px 14px; border-top: 1px solid #e5e7eb; }
+      .clip-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .clip-header label {
+        cursor: pointer;
+        margin: 0;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      #clip-status {
+        font-size: 11px;
+        color: #6b7280;
+      }
+      #clip-toggle { font-size: 11px; color: #6b7280; }
+      #clip-preview {
+        width: 100%;
+        height: 100px;
+        font-family: monospace;
+        font-size: 11px;
+        color: #374151;
+        background: #f9fafb;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        padding: 6px 8px;
+        resize: vertical;
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -162,10 +197,18 @@
           <label>Job URL</label>
           <input type="url" id="job-url" />
         </div>
-        <div class="field">
-          <label>Job description</label>
-          <textarea id="job-description" placeholder="Paste or extracted from page…"></textarea>
+      </div>
+
+      <!-- Page clipping preview (collapsible) -->
+      <div class="clip-section">
+        <div class="clip-header" id="clip-header">
+          <label>
+            Page clipping
+            <span id="clip-status">Clipping…</span>
+          </label>
+          <span id="clip-toggle">▶ Show</span>
         </div>
+        <textarea id="clip-preview" readonly placeholder="Clipped markdown will appear here…"></textarea>
       </div>
 
       <div class="footer">
@@ -178,7 +221,7 @@
 
       <div id="copy-fallback" class="copy-fallback section" style="display:none">
         <label>Copy as JSON (paste manually)</label>
-        <textarea id="copy-json" readonly></textarea>
+        <textarea id="copy-json" readonly style="height:60px;font-family:monospace;font-size:11px;"></textarea>
         <button class="btn btn-outline" style="margin-top:6px;width:100%" id="copy-btn">Copy JSON</button>
       </div>
     </div>

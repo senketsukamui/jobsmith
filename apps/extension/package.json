@@ -9,7 +9,12 @@
   },
   "devDependencies": {
     "@types/chrome": "^0.0.268",
+    "@types/turndown": "^5.0.6",
     "typescript": "^5.7.2",
     "vite": "^5.4.19"
+  },
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "turndown": "^7.2.4"
   }
 }

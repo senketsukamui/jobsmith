@@ -1,3 +1,5 @@
+import type { JobData } from '../content/sites'
+
 // ─── Storage helpers ──────────────────────────────────────────────────────────
 
 async function getStorage<T>(keys: string[]): Promise<Record<string, T>> {
@@ -14,7 +16,6 @@ const PORT_MIN = 53700
 const PORT_MAX = 53800
 
 async function discoverPort(token: string): Promise<number | null> {
-  // Try previously stored port first
   const stored = await getStorage<number>(['server_port'])
   if (stored.server_port) {
     try {
@@ -25,7 +26,6 @@ async function discoverPort(token: string): Promise<number | null> {
     } catch { /* fall through to scan */ }
   }
 
-  // Port scan fallback
   for (let port = PORT_MIN; port <= PORT_MAX; port++) {
     try {
       const res = await fetch(`http://127.0.0.1:${port}/api/health`, {
@@ -38,11 +38,11 @@ async function discoverPort(token: string): Promise<number | null> {
     } catch { /* continue */ }
   }
 
-  void token // suppress lint warning
+  void token
   return null
 }
 
-// ─── DOM refs ────────────────────────────────────────────────────────────────
+// ─── DOM refs ─────────────────────────────────────────────────────────────────
 
 const pairingView = document.getElementById('pairing-view')!
 const mainView = document.getElementById('main-view')!
@@ -62,12 +62,22 @@ const fieldRole = document.getElementById('role') as HTMLInputElement
 const fieldSource = document.getElementById('source') as HTMLSelectElement
 const fieldAppliedAt = document.getElementById('applied-at') as HTMLInputElement
 const fieldJobUrl = document.getElementById('job-url') as HTMLInputElement
-const fieldJobDescription = document.getElementById('job-description') as HTMLTextAreaElement
+
+const clipHeader = document.getElementById('clip-header')!
+const clipStatus = document.getElementById('clip-status')!
+const clipToggle = document.getElementById('clip-toggle')!
+const clipPreview = document.getElementById('clip-preview') as HTMLTextAreaElement
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
+let capturedMarkdown = ''
+
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
+}
+
+function wordCount(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length
 }
 
 function showStatus(msg: string, type: 'success' | 'error' | '') {
@@ -90,6 +100,15 @@ function showPairingView() {
   connectionBadge.className = 'header-badge'
 }
 
+// ─── Clip preview toggle ──────────────────────────────────────────────────────
+
+let previewOpen = false
+clipHeader.addEventListener('click', () => {
+  previewOpen = !previewOpen
+  clipPreview.style.display = previewOpen ? 'block' : 'none'
+  clipToggle.textContent = previewOpen ? '▼ Hide' : '▶ Show'
+})
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -103,23 +122,37 @@ async function init() {
 
   const port = await discoverPort(token)
   setMainView(token, port)
-
   fieldAppliedAt.value = todayISO()
 
-  // Pre-fill from content script via background
-  chrome.runtime.sendMessage({ type: 'GET_TAB_JOB_DATA' }, (jobData) => {
-    if (!jobData) return
-    if (jobData.company) fieldCompany.value = jobData.company
-    if (jobData.role) fieldRole.value = jobData.role
-    if (jobData.jobDescription) fieldJobDescription.value = jobData.jobDescription
-    if (jobData.jobUrl) fieldJobUrl.value = jobData.jobUrl
-    if (jobData.source) fieldSource.value = jobData.source
-  })
-
-  // Pre-fill URL from active tab if no content script data
+  // Get active tab, pre-fill URL, then request on-demand clip
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-    const url = tabs[0]?.url ?? ''
-    if (!fieldJobUrl.value && url.startsWith('http')) fieldJobUrl.value = url
+    const tab = tabs[0]
+    const url = tab?.url ?? ''
+    if (url.startsWith('http')) fieldJobUrl.value = url
+
+    const tabId = tab?.id
+    if (!tabId) {
+      clipStatus.textContent = 'No active tab'
+      return
+    }
+
+    chrome.tabs.sendMessage(tabId, { type: 'JT_EXTRACT' }, (jobData: JobData | undefined) => {
+      if (chrome.runtime.lastError || !jobData) {
+        clipStatus.textContent = 'Could not clip page'
+        return
+      }
+
+      capturedMarkdown = jobData.pageMarkdown
+
+      if (jobData.company) fieldCompany.value = jobData.company
+      if (jobData.role) fieldRole.value = jobData.role
+      if (jobData.jobUrl) fieldJobUrl.value = jobData.jobUrl
+      if (jobData.source) fieldSource.value = jobData.source
+
+      const words = wordCount(capturedMarkdown)
+      clipStatus.textContent = words > 0 ? `Clipped — ${words.toLocaleString()} words` : 'No content clipped'
+      clipPreview.value = capturedMarkdown.slice(0, 3000) + (capturedMarkdown.length > 3000 ? '\n…' : '')
+    })
   })
 }
 
@@ -139,7 +172,6 @@ pairBtn.addEventListener('click', async () => {
     return
   }
 
-  // Verify token
   try {
     const res = await fetch(`http://127.0.0.1:${port}/api/statuses`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -187,7 +219,7 @@ submitBtn.addEventListener('click', async () => {
   const payload = {
     company: { name: company },
     role_title: role,
-    job_description: fieldJobDescription.value.trim() || undefined,
+    page_markdown: capturedMarkdown || undefined,
     job_url: fieldJobUrl.value.trim() || undefined,
     source: fieldSource.value,
     applied_at: fieldAppliedAt.value
@@ -203,7 +235,7 @@ submitBtn.addEventListener('click', async () => {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(10000),
     })
 
     if (res.ok) {
@@ -215,7 +247,7 @@ submitBtn.addEventListener('click', async () => {
       showStatus(msg, 'error')
       offerCopyFallback(payload)
     }
-  } catch (err) {
+  } catch {
     showStatus('App not running or unreachable.', 'error')
     offerCopyFallback(payload)
   } finally {

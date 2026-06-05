@@ -23,6 +23,42 @@ const SOURCE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
+function PageClippingSection({ markdown }: { markdown: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const wordCount = markdown.trim().split(/\s+/).filter(Boolean).length
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+          Page clipping
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">{wordCount.toLocaleString()} words</span>
+          <button
+            type="button"
+            onClick={() => navigator.clipboard.writeText(markdown)}
+            className="text-xs text-primary hover:underline"
+          >
+            Copy
+          </button>
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            {expanded ? 'Hide' : 'Show'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <pre className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap font-mono bg-muted/40 rounded-md p-2 max-h-64 overflow-y-auto">
+          {markdown}
+        </pre>
+      )}
+    </div>
+  )
+}
+
 export function ApplicationDetailPanel({ applicationId, statuses, onClose }: ApplicationDetailPanelProps) {
   const queryClient = useQueryClient()
   const appQuery = trpc.applications.get.useQuery(applicationId)
@@ -132,6 +168,11 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
                 {descExpanded ? 'Show less' : 'Show more'}
               </button>
             </div>
+          )}
+
+          {/* Page clipping */}
+          {app.page_markdown && (
+            <PageClippingSection markdown={app.page_markdown} />
           )}
 
           {/* Cover letters */}

@@ -74,6 +74,7 @@ export async function createApplication(
     current_status_id: defaultStatus.id,
     applied_at: input.applied_at ?? now,
     last_activity_at: now,
+    page_markdown: input.page_markdown ?? null,
     archived: 0,
     created_at: now,
     updated_at: now,

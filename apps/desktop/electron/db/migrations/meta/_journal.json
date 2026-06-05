@@ -8,6 +8,13 @@
       "when": 1780580599832,
       "tag": "0000_hot_james_howlett",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1780668142070,
+      "tag": "0001_jazzy_ink",
+      "breakpoints": true
     }
   ]
 }

@@ -68,6 +68,7 @@ export const ApplicationSchema = z.object({
   current_status_id: z.string(),
   applied_at: z.number().nullable(),
   last_activity_at: z.number().nullable(),
+  page_markdown: z.string().nullable(),
   archived: z.number(),
   created_at: z.number(),
   updated_at: z.number(),
@@ -162,6 +163,7 @@ export const CreateApplicationInput = z.object({
   source: ApplicationSourceSchema.default('manual'),
   cv_id: z.string().nullable().optional(),
   applied_at: z.number().optional(),
+  page_markdown: z.string().optional(),
 })
 export type CreateApplicationInput = z.infer<typeof CreateApplicationInput>
 

@@ -477,17 +477,21 @@ Organized by area. **MUST** = v1 must ship with it. **SHOULD** = v1 should have 
 
 ### 4.2 Chrome extension
 
-**US-8 (MUST)** — On a LinkedIn job page, the extension popup pre-fills company, role, JD, and URL from the page.
+**US-8 (MUST)** — On any job page, the extension popup clips the full page to Markdown and pre-fills company, role, and URL from heuristic title parsing.
 
-> AC: Content script runs on `linkedin.com/jobs/*`. Uses MutationObserver because LinkedIn is an SPA. Extracts company name, job title, JD text, posting URL. Popup opens with fields populated. User can edit before submitting.
+> AC: A universal content script (runs on all HTTP/HTTPS pages) uses `@mozilla/readability` to extract the main article content and `turndown` to convert it to Markdown. The raw Markdown is stored in `applications.page_markdown`. Company and role are pre-filled by parsing `document.title` (common pattern: "Job Title at Company | Site") and are user-editable before submitting. The popup shows a word count and a collapsible preview of the clipped Markdown.
 
-**US-9 (MUST)** — Same for Lever (`jobs.lever.co/*`) and Greenhouse (`boards.greenhouse.io/*`, `job-boards.greenhouse.io/*`).
+**US-8a (LATER)** — LLM auto-parses company, role, and job description from the stored `page_markdown`.
 
-> AC: Per-site content scripts using stable DOM selectors. Document the selectors used in `apps/extension/src/content/sites.md` so they're easy to fix when sites change.
+> AC: "Parse with AI" button on the application detail panel sends `page_markdown` to Ollama with a structured extraction prompt. The LLM response auto-populates `role_title`, `company.name`, and `job_description` fields. User reviews and confirms before saving.
 
-**US-10 (MUST)** — On any unsupported page, the popup lets me manually enter all fields.
+**US-9 (MUST)** — The clipping approach works on LinkedIn, Lever, Greenhouse, and any other job board or company careers page — no per-site selectors required.
 
-> AC: If no content script matches, popup shows empty form. The URL is still pre-filled from the current tab.
+> AC: Source (linkedin / lever / greenhouse / other) is detected automatically from the page hostname. No per-site content scripts; one universal clipper handles all pages.
+
+**US-10 (MUST)** — On any page, the popup lets the user edit company and role before submitting.
+
+> AC: Company and role fields are always user-editable. The URL is pre-filled from the active tab. The clipped Markdown is shown as a collapsible preview.
 
 **US-11 (MUST)** — Extension submits to the local desktop app and shows success or failure.
 
