@@ -58,6 +58,9 @@ const applicationsRouter = router({
   stale: procedure.input(z.number().optional()).query(({ input }) =>
     ApplicationService.getStaleApplications(input ?? 7)
   ),
+  parseMarkdown: procedure.input(z.string()).mutation(({ input }) =>
+    ApplicationService.parseApplicationMarkdown(input)
+  ),
 })
 
 // ─── Companies ────────────────────────────────────────────────────────────────

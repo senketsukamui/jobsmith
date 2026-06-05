@@ -2,8 +2,30 @@ import { useState } from 'react'
 import { trpc } from '@/lib/trpc'
 import { useUiStore } from '@/stores/ui'
 import { ApplicationTable } from '@/components/ApplicationTable'
+import { KanbanBoard } from '@/components/KanbanBoard'
 import { AddApplicationDialog } from '@/components/AddApplicationDialog'
 import { ApplicationDetailPanel } from '@/components/ApplicationDetailPanel'
+
+function TableIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="1" width="12" height="12" rx="1" />
+      <line x1="1" y1="5" x2="13" y2="5" />
+      <line x1="1" y1="9" x2="13" y2="9" />
+      <line x1="5" y1="5" x2="5" y2="13" />
+    </svg>
+  )
+}
+
+function KanbanIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="1" y="1" width="3" height="12" rx="1" />
+      <rect x="5.5" y="1" width="3" height="8" rx="1" />
+      <rect x="10" y="1" width="3" height="10" rx="1" />
+    </svg>
+  )
+}
 
 export function ApplicationsPage() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
@@ -12,11 +34,13 @@ export function ApplicationsPage() {
     sourceFilter,
     searchQuery,
     showArchived,
+    viewMode,
     openAddDialog,
     setStatusFilter,
     setSourceFilter,
     setSearchQuery,
     setShowArchived,
+    setViewMode,
   } = useUiStore()
   const [showFollowUp, setShowFollowUp] = useState(false)
 
@@ -37,11 +61,17 @@ export function ApplicationsPage() {
     ? (staleQuery.data ?? [])
     : (applicationsQuery.data ?? [])
 
+  const isLoading = showFollowUp ? staleQuery.isLoading : applicationsQuery.isLoading
+  const isError = showFollowUp ? staleQuery.isError : applicationsQuery.isError
+  const errorMessage = showFollowUp
+    ? staleQuery.error?.message
+    : applicationsQuery.error?.message
+
   return (
     <div className="flex h-full min-w-0 overflow-hidden">
-      {/* ── Left: toolbar + table ── */}
+      {/* ── Left: toolbar + view ── */}
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        {/* Primary bar: title · search · add */}
+        {/* Primary bar: title · search · view toggle · add */}
         <div className="flex items-center gap-3 px-4 pt-4 pb-2 shrink-0">
           <h1 className="text-base font-semibold shrink-0">Applications</h1>
 
@@ -53,6 +83,29 @@ export function ApplicationsPage() {
             className="min-w-0 flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
 
+          <div className="flex items-center rounded-md border border-input shrink-0">
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              className={`flex items-center justify-center w-8 h-8 rounded-l-md transition-colors ${
+                viewMode === 'table' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Table view"
+            >
+              <TableIcon />
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center justify-center w-8 h-8 rounded-r-md border-l border-input transition-colors ${
+                viewMode === 'kanban' ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'
+              }`}
+              title="Kanban view"
+            >
+              <KanbanIcon />
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={openAddDialog}
@@ -62,7 +115,7 @@ export function ApplicationsPage() {
           </button>
         </div>
 
-        {/* Filter bar: status chips · source · archived */}
+        {/* Filter bar: status chips · source · follow-up · archived */}
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border shrink-0">
           {statuses.map((s) => {
             const active = statusFilter.includes(s.id)
@@ -137,23 +190,32 @@ export function ApplicationsPage() {
           </label>
         </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-auto px-4 py-3">
-          {applicationsQuery.isLoading ? (
+        {/* Content */}
+        <div className="flex-1 overflow-hidden">
+          {isLoading ? (
             <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
               Loading…
             </div>
-          ) : applicationsQuery.isError ? (
+          ) : isError ? (
             <div className="flex items-center justify-center py-24 text-destructive text-sm">
-              Error: {applicationsQuery.error.message}
+              Error: {errorMessage}
             </div>
-          ) : (
-            <ApplicationTable
+          ) : viewMode === 'kanban' ? (
+            <KanbanBoard
               applications={applications}
               statuses={statuses}
               selectedId={selectedAppId}
-              onRowClick={(id) => setSelectedAppId(id === selectedAppId ? null : id)}
+              onCardClick={(id) => setSelectedAppId(id === selectedAppId ? null : id)}
             />
+          ) : (
+            <div className="overflow-auto h-full px-4 py-3">
+              <ApplicationTable
+                applications={applications}
+                statuses={statuses}
+                selectedId={selectedAppId}
+                onRowClick={(id) => setSelectedAppId(id === selectedAppId ? null : id)}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -1,4 +1,6 @@
 import { and, desc, eq, inArray, like, lt, or } from 'drizzle-orm'
+import fs from 'fs'
+import path from 'path'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import {
@@ -9,6 +11,8 @@ import {
 } from '../db/schema'
 import { upsertCompanyByName } from './companies'
 import { getDefaultStatus } from './statuses'
+import { streamGenerate } from './ollama'
+import { getSetting } from './settings'
 import type {
   ApplicationWithRelations,
   ApplicationStatusHistoryWithStatus,
@@ -219,6 +223,43 @@ export async function autoGhostStaleApplications(): Promise<number> {
   }
 
   return stale.length
+}
+
+export interface ParsedMarkdownFields {
+  company_name: string
+  role_title: string
+  job_description: string
+}
+
+const PARSE_PROMPT_PATH = path.join(__dirname, '../services/llm/prompts/parse-markdown.md')
+
+function loadParsePrompt(): string {
+  try { return fs.readFileSync(PARSE_PROMPT_PATH, 'utf-8') } catch {
+    return 'Extract company_name, role_title, job_description from this job posting as JSON.\n\nPAGE CONTENT:\n{page_markdown}'
+  }
+}
+
+export async function parseApplicationMarkdown(
+  id: string
+): Promise<ParsedMarkdownFields> {
+  const app = await getApplication(id)
+  if (!app) throw new Error('Application not found')
+  if (!app.page_markdown) throw new Error('No page clipping stored for this application')
+
+  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:7b-instruct'
+  const prompt = loadParsePrompt().replace('{page_markdown}', app.page_markdown.slice(0, 8000))
+
+  let raw = ''
+  for await (const token of streamGenerate(model, prompt, undefined, { format: 'json' })) {
+    raw += token
+  }
+
+  const parsed = JSON.parse(raw) as ParsedMarkdownFields
+  return {
+    company_name: parsed.company_name ?? '',
+    role_title: parsed.role_title ?? '',
+    job_description: parsed.job_description ?? '',
+  }
 }
 
 export async function deleteApplication(id: string): Promise<void> {

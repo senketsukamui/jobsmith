@@ -6,11 +6,37 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.node.json --noEmit && vite build",
+    "dist:mac": "pnpm build && electron-builder --mac --dir",
+    "dist:mac:dmg": "pnpm build && electron-builder --mac dmg",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "postinstall": "electron-rebuild -f -w @libsql/client 2>/dev/null || true"
+  },
+  "build": {
+    "appId": "com.jobtracker.app",
+    "productName": "Job Tracker",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**",
+      "dist-electron/**"
+    ],
+    "extraResources": [
+      {
+        "from": "electron/db/migrations",
+        "to": "migrations"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.icns",
+      "target": [
+        { "target": "dir", "arch": ["arm64"] }
+      ]
+    }
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",

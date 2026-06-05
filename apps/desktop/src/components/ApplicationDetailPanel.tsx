@@ -59,12 +59,97 @@ function PageClippingSection({ markdown }: { markdown: string }) {
   )
 }
 
+interface ParseReviewModalProps {
+  applicationId: string
+  parsed: { company_name: string; role_title: string; job_description: string }
+  onClose: () => void
+}
+
+function ParseReviewModal({ applicationId, parsed, onClose }: ParseReviewModalProps) {
+  const queryClient = useQueryClient()
+  const [role, setRole] = useState(parsed.role_title)
+  const [desc, setDesc] = useState(parsed.job_description)
+
+  const updateMutation = trpc.applications.update.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries()
+      onClose()
+    },
+  })
+
+  function handleSave() {
+    updateMutation.mutate({
+      id: applicationId,
+      role_title: role || undefined,
+      job_description: desc || undefined,
+    })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-lg rounded-xl border border-border bg-card shadow-lg p-6 space-y-4 mx-4">
+        <div>
+          <h2 className="text-sm font-semibold">AI extracted fields</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Review and edit before saving.</p>
+        </div>
+
+        {parsed.company_name && (
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Company (read-only)</label>
+            <p className="text-sm px-3 py-2 rounded-md bg-muted/40 text-muted-foreground">{parsed.company_name}</p>
+          </div>
+        )}
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Role title</label>
+          <input
+            type="text"
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job description</label>
+          <textarea
+            value={desc}
+            onChange={(e) => setDesc(e.target.value)}
+            rows={8}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end pt-1">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent"
+          >
+            Discard
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={updateMutation.isLoading || (!role.trim() && !desc.trim())}
+            className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {updateMutation.isLoading ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function ApplicationDetailPanel({ applicationId, statuses, onClose }: ApplicationDetailPanelProps) {
   const queryClient = useQueryClient()
   const appQuery = trpc.applications.get.useQuery(applicationId)
   const coverLettersQuery = trpc.coverLetters.list.useQuery(applicationId)
   const [showCoverLetterModal, setShowCoverLetterModal] = useState(false)
   const [descExpanded, setDescExpanded] = useState(false)
+  const [parseResult, setParseResult] = useState<{ company_name: string; role_title: string; job_description: string } | null>(null)
+  const [parseError, setParseError] = useState<string | null>(null)
 
   const deleteCoverLetter = trpc.coverLetters.delete.useMutation({
     onSuccess: () => queryClient.invalidateQueries(),
@@ -72,6 +157,14 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
 
   const archiveMutation = trpc.applications.archive.useMutation({
     onSuccess: () => queryClient.invalidateQueries(),
+  })
+
+  const parseMutation = trpc.applications.parseMarkdown.useMutation({
+    onSuccess: (data) => {
+      setParseError(null)
+      setParseResult(data)
+    },
+    onError: (err) => setParseError(err.message),
   })
 
   const app = appQuery.data
@@ -185,9 +278,27 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
             </div>
           )}
 
-          {/* Page clipping */}
+          {/* Page clipping + Parse with AI */}
           {app.page_markdown && (
-            <PageClippingSection markdown={app.page_markdown} />
+            <div className="space-y-2">
+              <PageClippingSection markdown={app.page_markdown} />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setParseError(null)
+                    parseMutation.mutate(app.id)
+                  }}
+                  disabled={parseMutation.isLoading}
+                  className="h-7 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent disabled:opacity-50 transition-colors"
+                >
+                  {parseMutation.isLoading ? 'Parsing…' : 'Parse with AI'}
+                </button>
+                {parseError && (
+                  <span className="text-xs text-destructive">{parseError}</span>
+                )}
+              </div>
+            </div>
           )}
 
           {/* Cover letters */}
@@ -252,6 +363,14 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
             setShowCoverLetterModal(false)
             queryClient.invalidateQueries()
           }}
+        />
+      )}
+
+      {parseResult && (
+        <ParseReviewModal
+          applicationId={applicationId}
+          parsed={parseResult}
+          onClose={() => setParseResult(null)}
         />
       )}
     </>
