@@ -7,7 +7,7 @@ import { emails, companies, applications, statuses } from '../db/schema'
 import { getGmailClient, getLastHistoryId, setLastHistoryId } from './gmail'
 import { getSetting } from './settings'
 import { streamGenerate } from './ollama'
-import type { EmailClassification } from '@job-tracker/shared'
+import type { EmailClassification } from '@jobsmith/shared'
 
 const PROMPT_PATH = path.join(__dirname, '../services/llm/prompts/email-classification.md')
 

@@ -1,5 +1,5 @@
 {
-  "name": "@job-tracker/desktop",
+  "name": "@jobsmith/desktop",
   "private": true,
   "version": "0.1.0",
   "main": "dist-electron/main.js",
@@ -16,7 +16,7 @@
   },
   "build": {
     "appId": "com.jobtracker.app",
-    "productName": "Job Tracker",
+    "productName": "Jobsmith",
     "directories": {
       "output": "release"
     },
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.2.0",
-    "@job-tracker/shared": "workspace:*",
+    "@jobsmith/shared": "workspace:*",
     "@libsql/client": "^0.14.0",
     "@tanstack/react-query": "^4.36.1",
     "@trpc/client": "^10.45.2",

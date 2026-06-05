@@ -82,7 +82,7 @@ For v1, run libSQL in **local-file mode only** (`file:./data.db`). Add a `sync_u
 ### 1.5 Project structure
 
 ```
-job-tracker/
+jobsmith/
 ├── apps/
 │   ├── desktop/                  # Electron app
 │   │   ├── electron/
@@ -269,8 +269,8 @@ Two surfaces:
 
 The Electron app writes a JSON file to a well-known location on launch:
 
-- macOS: `~/Library/Application Support/job-tracker/server.json`
-- Linux: `~/.config/job-tracker/server.json`
+- macOS: `~/Library/Application Support/jobsmith/server.json`
+- Linux: `~/.config/jobsmith/server.json`
 
 ```json
 { "port": 53741, "version": "0.1.0" }

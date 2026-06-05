@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc'
-import type { Email } from '@job-tracker/shared'
+import type { Email } from '@jobsmith/shared'
 
 const CLASSIFICATION_LABELS: Record<string, string> = {
   acknowledgment: 'Acknowledgment',

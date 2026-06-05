@@ -35,7 +35,7 @@ export function OnboardingWizard({ onDone }: Props) {
         {step === 'welcome' && (
           <>
             <div className="space-y-2 text-center">
-              <h1 className="text-xl font-semibold">Welcome to Job Tracker</h1>
+              <h1 className="text-xl font-semibold">Welcome to Jobsmith</h1>
               <p className="text-sm text-muted-foreground">
                 A local-first app to track applications, scan Gmail, and generate cover letters. Let's get you set up in a few steps.
               </p>
@@ -60,7 +60,7 @@ export function OnboardingWizard({ onDone }: Props) {
             <div className="space-y-2">
               <h2 className="text-lg font-semibold">1 / 2 — Ollama (AI)</h2>
               <p className="text-sm text-muted-foreground">
-                Job Tracker uses Ollama for cover letter generation and email classification. Install it from{' '}
+                Jobsmith uses Ollama for cover letter generation and email classification. Install it from{' '}
                 <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">ollama.com</span> and run{' '}
                 <span className="font-mono text-xs bg-muted px-1 py-0.5 rounded">ollama pull qwen2.5:7b-instruct</span>.
               </p>

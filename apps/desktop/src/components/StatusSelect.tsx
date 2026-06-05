@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { Status } from '@job-tracker/shared'
+import type { Status } from '@jobsmith/shared'
 import { trpc } from '@/lib/trpc'
 import { StatusBadge } from './StatusBadge'
 

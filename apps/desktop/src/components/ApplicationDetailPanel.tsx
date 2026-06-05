@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc'
-import type { Status } from '@job-tracker/shared'
+import type { Status } from '@jobsmith/shared'
 import { CoverLetterModal } from './CoverLetterModal'
 
 interface ApplicationDetailPanelProps {

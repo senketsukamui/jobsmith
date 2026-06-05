@@ -1,6 +1,6 @@
 import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
-import type { ApplicationSource, StatusHistorySource, EmailClassification, EmailUserAction } from '@job-tracker/shared'
+import type { ApplicationSource, StatusHistorySource, EmailClassification, EmailUserAction } from '@jobsmith/shared'
 
 export const companies = sqliteTable(
   'companies',

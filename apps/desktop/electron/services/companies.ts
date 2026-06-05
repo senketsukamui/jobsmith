@@ -2,7 +2,7 @@ import { eq, like, sql } from 'drizzle-orm'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import { companies } from '../db/schema'
-import type { Company, CreateCompanyInput } from '@job-tracker/shared'
+import type { Company, CreateCompanyInput } from '@jobsmith/shared'
 
 export async function listCompanies(query?: string): Promise<Company[]> {
   const db = getDb()

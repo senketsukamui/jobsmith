@@ -1,4 +1,4 @@
-import type { Status } from '@job-tracker/shared'
+import type { Status } from '@jobsmith/shared'
 
 interface StatusBadgeProps {
   status: Status

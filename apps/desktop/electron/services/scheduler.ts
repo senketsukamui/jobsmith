@@ -26,7 +26,7 @@ export async function startScheduler(): Promise<void> {
           msg.push(`${result.autoApplied} status update${result.autoApplied > 1 ? 's' : ''} applied automatically`)
         if (result.newMatches > 0)
           msg.push(`${result.newMatches} email${result.newMatches > 1 ? 's' : ''} need review`)
-        notify('Job Tracker', msg.join(' · '))
+        notify('Jobsmith', msg.join(' · '))
       }
       await updateBadgeCount()
     } catch { /* errors logged elsewhere */ }
@@ -40,7 +40,7 @@ export async function startScheduler(): Promise<void> {
       const notifEnabled = (await getSetting('notification_enabled')) !== '0'
       if (ghosted > 0 && notifEnabled) {
         notify(
-          'Job Tracker',
+          'Jobsmith',
           `${ghosted} application${ghosted > 1 ? 's were' : ' was'} marked Ghosted after 3 weeks with no response.`
         )
       }
@@ -50,7 +50,7 @@ export async function startScheduler(): Promise<void> {
       const stale = await getStaleApplications(thresholdDays)
       if (stale.length > 0 && notifEnabled) {
         notify(
-          'Job Tracker',
+          'Jobsmith',
           `${stale.length} application${stale.length > 1 ? 's need' : ' needs'} follow-up.`
         )
       }

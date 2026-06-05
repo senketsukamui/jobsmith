@@ -1,4 +1,4 @@
-import type { ApplicationWithRelations, Status } from '@job-tracker/shared'
+import type { ApplicationWithRelations, Status } from '@jobsmith/shared'
 
 function formatDate(ts: number | null): string {
   if (!ts) return '—'

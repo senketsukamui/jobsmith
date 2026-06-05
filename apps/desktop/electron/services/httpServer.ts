@@ -8,7 +8,7 @@ import { handleOAuthCallback } from './gmail'
 import * as ApplicationService from './applications'
 import * as CompanyService from './companies'
 import * as StatusService from './statuses'
-import { CreateApplicationInput } from '@job-tracker/shared'
+import { CreateApplicationInput } from '@jobsmith/shared'
 
 const PORT_MIN = 53700
 const PORT_MAX = 53800

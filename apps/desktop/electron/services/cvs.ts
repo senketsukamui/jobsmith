@@ -5,7 +5,7 @@ import fs from 'fs'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import { cvs, applications } from '../db/schema'
-import type { Cv } from '@job-tracker/shared'
+import type { Cv } from '@jobsmith/shared'
 
 function getCvDir() {
   const dir = path.join(app.getPath('userData'), 'cvs')

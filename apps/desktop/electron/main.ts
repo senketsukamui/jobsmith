@@ -96,11 +96,11 @@ function createTray() {
     : nativeImage.createEmpty()
 
   tray = new Tray(icon)
-  tray.setToolTip('Job Tracker')
+  tray.setToolTip('Jobsmith')
 
   const menu = Menu.buildFromTemplate([
     {
-      label: 'Open Job Tracker',
+      label: 'Open Jobsmith',
       click: () => {
         if (win) {
           win.show()

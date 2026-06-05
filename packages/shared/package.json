@@ -1,5 +1,5 @@
 {
-  "name": "@job-tracker/shared",
+  "name": "@jobsmith/shared",
   "private": true,
   "version": "0.1.0",
   "type": "module",

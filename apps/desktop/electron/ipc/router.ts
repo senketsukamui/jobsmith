@@ -9,7 +9,7 @@ import {
   CreateCompanyInput,
   CreateStatusInput,
   UpdateStatusInput,
-} from '@job-tracker/shared'
+} from '@jobsmith/shared'
 import * as ApplicationService from '../services/applications'
 import * as CompanyService from '../services/companies'
 import * as StatusService from '../services/statuses'

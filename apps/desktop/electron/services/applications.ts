@@ -20,7 +20,7 @@ import type {
   UpdateApplicationInput,
   ChangeStatusInput,
   ListApplicationsInput,
-} from '@job-tracker/shared'
+} from '@jobsmith/shared'
 
 export async function listApplications(
   input: ListApplicationsInput

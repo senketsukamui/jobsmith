@@ -7,7 +7,7 @@ import { cover_letters, applications, companies, cvs } from '../db/schema'
 import { getSetting } from './settings'
 import { getCvText } from './cvs'
 import { streamGenerate } from './ollama'
-import type { CoverLetter } from '@job-tracker/shared'
+import type { CoverLetter } from '@jobsmith/shared'
 
 const PROMPT_PATH = path.join(__dirname, '../services/llm/prompts/cover-letter.md')
 

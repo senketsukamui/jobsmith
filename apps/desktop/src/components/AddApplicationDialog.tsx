@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import type { ApplicationSource } from '@job-tracker/shared'
+import type { ApplicationSource } from '@jobsmith/shared'
 import { trpc } from '@/lib/trpc'
 import { useUiStore } from '@/stores/ui'
 

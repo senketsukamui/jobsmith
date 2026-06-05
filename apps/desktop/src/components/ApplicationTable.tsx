@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ApplicationWithRelations, Status } from '@job-tracker/shared'
+import type { ApplicationWithRelations, Status } from '@jobsmith/shared'
 import { StatusSelect } from './StatusSelect'
 
 type SortKey = 'company' | 'role' | 'source' | 'applied_at' | 'last_activity_at'

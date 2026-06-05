@@ -2,7 +2,7 @@ import { asc, eq, ne, count } from 'drizzle-orm'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import { statuses, applications } from '../db/schema'
-import type { Status, CreateStatusInput, UpdateStatusInput } from '@job-tracker/shared'
+import type { Status, CreateStatusInput, UpdateStatusInput } from '@jobsmith/shared'
 
 export async function listStatuses(): Promise<Status[]> {
   const db = getDb()

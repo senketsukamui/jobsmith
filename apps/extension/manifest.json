@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Job Tracker",
+  "name": "Jobsmith",
   "version": "0.1.0",
   "description": "One-click job application capture for LinkedIn, Lever, and Greenhouse.",
 
@@ -8,7 +8,7 @@
 
   "action": {
     "default_popup": "popup/index.html",
-    "default_title": "Job Tracker"
+    "default_title": "Jobsmith"
   },
 
   "background": {
