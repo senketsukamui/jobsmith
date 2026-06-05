@@ -132,9 +132,9 @@ function createTray() {
 // ─── Deep link (OAuth callback) ───────────────────────────────────────────────
 
 if (process.defaultApp) {
-  if (process.argv.length >= 2) app.setAsDefaultProtocolClient('job-tracker', process.execPath, [path.resolve(process.argv[1])])
+  if (process.argv.length >= 2) app.setAsDefaultProtocolClient('jobsmith', process.execPath, [path.resolve(process.argv[1])])
 } else {
-  app.setAsDefaultProtocolClient('job-tracker')
+  app.setAsDefaultProtocolClient('jobsmith')
 }
 
 app.on('open-url', (_event, url) => {

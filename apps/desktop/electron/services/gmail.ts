@@ -3,7 +3,7 @@ import { safeStorage, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-const REDIRECT_URI = 'job-tracker://oauth/gmail/callback'
+const REDIRECT_URI = 'jobsmith://oauth/gmail/callback'
 
 const CREDS_KEY = 'gmail_credentials_encrypted'
 const HISTORY_KEY = 'gmail_last_history_id'
