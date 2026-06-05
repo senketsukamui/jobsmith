@@ -22,11 +22,15 @@ export function StatusSelect({ applicationId, currentStatus, statuses }: StatusS
   })
 
   if (!open) {
-    return <StatusBadge status={currentStatus} onClick={() => setOpen(true)} />
+    return (
+      <span onClick={(e) => e.stopPropagation()}>
+        <StatusBadge status={currentStatus} onClick={() => setOpen(true)} />
+      </span>
+    )
   }
 
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <StatusBadge status={currentStatus} onClick={() => setOpen(false)} />
       <div className="absolute left-0 top-full mt-1 z-50 min-w-[160px] rounded-md border border-border bg-popover shadow-md">
         {statuses.map((s) => (
