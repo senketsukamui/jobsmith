@@ -338,6 +338,110 @@ function GmailSection() {
   )
 }
 
+function ExportSection() {
+  const queryClient = useQueryClient()
+  const setSetting = trpc.settings.set.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+  const settingsQuery = trpc.settings.getAll.useQuery()
+  const validateQuery = trpc.export.validateNotion.useQuery(undefined, { enabled: false, retry: false })
+  const notionMutation = trpc.export.notion.useMutation()
+
+  const savedToken = settingsQuery.data?.notion_api_key ?? ''
+  const savedDbId = settingsQuery.data?.notion_database_id ?? ''
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Export</h2>
+
+      {/* Notion */}
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Notion</p>
+        <p className="text-xs text-muted-foreground">
+          Create an integration at{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">notion.so/my-integrations</span>,
+          share a database with it, then paste the token and database ID below.
+          The database should have these properties:{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Name (title)</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Company</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Role</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Status</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Source</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Applied</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">URL</span>,{' '}
+          <span className="font-mono bg-muted px-1 py-0.5 rounded text-[11px]">Archived</span>.
+        </p>
+
+        <div className="space-y-2">
+          <input
+            type="password"
+            defaultValue={savedToken}
+            placeholder="Notion integration token (secret_…)"
+            onBlur={(e) => {
+              if (e.target.value.trim()) setSetting.mutate({ key: 'notion_api_key', value: e.target.value.trim() })
+            }}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <input
+            type="text"
+            defaultValue={savedDbId}
+            placeholder="Database ID (32-char hex or full URL)"
+            onBlur={(e) => {
+              const raw = e.target.value.trim()
+              // Strip URL down to the bare ID if the user pasted a full Notion URL
+              const match = raw.match(/([0-9a-f]{32})/i)
+              const id = match ? match[1] : raw
+              if (id) setSetting.mutate({ key: 'notion_database_id', value: id })
+            }}
+            className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            type="button"
+            onClick={() => validateQuery.refetch()}
+            disabled={validateQuery.isFetching || !savedToken || !savedDbId}
+            className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent disabled:opacity-50 transition-colors"
+          >
+            {validateQuery.isFetching ? 'Testing…' : 'Test connection'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => notionMutation.mutate()}
+            disabled={notionMutation.isLoading || !savedToken || !savedDbId}
+            className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {notionMutation.isLoading ? 'Exporting…' : 'Export all to Notion'}
+          </button>
+
+          {validateQuery.data && (
+            <span className={`text-xs ${validateQuery.data.ok ? 'text-green-600' : 'text-destructive'}`}>
+              {validateQuery.data.ok
+                ? `Connected — "${validateQuery.data.name}"`
+                : `Error: ${validateQuery.data.error}`}
+            </span>
+          )}
+
+          {notionMutation.isSuccess && notionMutation.data && (
+            <span className="text-xs text-green-600">
+              Done — {notionMutation.data.exported} exported
+              {notionMutation.data.failed > 0 ? `, ${notionMutation.data.failed} failed` : ''}
+            </span>
+          )}
+
+          {notionMutation.isError && (
+            <span className="text-xs text-destructive">
+              {notionMutation.error?.message ?? 'Export failed'}
+            </span>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function PairingSection() {
   const queryClient = useQueryClient()
   const tokenQuery = trpc.settings.getPairingToken.useQuery()
@@ -713,6 +817,7 @@ export function SettingsPage() {
         <CvsSection />
         <StatusesSection />
         <NotificationsSection />
+        <ExportSection />
         <PairingSection />
       </div>
     </div>

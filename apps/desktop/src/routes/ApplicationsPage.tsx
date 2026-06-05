@@ -27,6 +27,21 @@ function KanbanIcon() {
   )
 }
 
+function ExportCsvButton() {
+  const exportCsv = trpc.export.csv.useMutation()
+  return (
+    <button
+      type="button"
+      onClick={() => exportCsv.mutate()}
+      disabled={exportCsv.isLoading}
+      title="Export all applications to CSV"
+      className="shrink-0 inline-flex h-8 items-center justify-center rounded-md border border-input px-3 text-sm hover:bg-accent disabled:opacity-50 transition-colors"
+    >
+      {exportCsv.isLoading ? 'Exporting…' : 'Export CSV'}
+    </button>
+  )
+}
+
 export function ApplicationsPage() {
   const [selectedAppId, setSelectedAppId] = useState<string | null>(null)
   const {
@@ -105,6 +120,8 @@ export function ApplicationsPage() {
               <KanbanIcon />
             </button>
           </div>
+
+          <ExportCsvButton />
 
           <button
             type="button"

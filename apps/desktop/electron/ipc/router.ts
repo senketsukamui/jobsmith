@@ -20,6 +20,7 @@ import * as SettingsService from '../services/settings'
 import * as PairingService from '../services/pairing'
 import * as GmailService from '../services/gmail'
 import * as EmailScannerService from '../services/emailScanner'
+import * as ExportService from '../services/export'
 import { updateBadgeCount } from '../services/notifications'
 
 const t = initTRPC.create({ isServer: true })
@@ -236,6 +237,14 @@ const emailsRouter = router({
   history: procedure.query(() => EmailScannerService.getRecentEmails()),
 })
 
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+const exportRouter = router({
+  csv: procedure.mutation(() => ExportService.exportToCsv()),
+  notion: procedure.mutation(() => ExportService.exportToNotion()),
+  validateNotion: procedure.query(() => ExportService.validateNotionConnection()),
+})
+
 // ─── App router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -248,6 +257,7 @@ export const appRouter = router({
   settings: settingsRouter,
   gmail: gmailRouter,
   emails: emailsRouter,
+  export: exportRouter,
 })
 
 export type AppRouter = typeof appRouter
