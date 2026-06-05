@@ -180,6 +180,47 @@ export async function getStaleApplications(
   return rows.map((r) => ({ ...r.application, company: r.company, status: r.status }))
 }
 
+export async function autoGhostStaleApplications(): Promise<number> {
+  const db = getDb()
+
+  const allStatuses = await db.select().from(statuses)
+  const applied = allStatuses.find((s) => s.name.toLowerCase() === 'applied')
+  const ghosted = allStatuses.find((s) => s.name.toLowerCase() === 'ghosted')
+  if (!applied || !ghosted) return 0
+
+  const cutoff = Date.now() - 21 * 24 * 60 * 60 * 1000
+  const stale = await db
+    .select()
+    .from(applications)
+    .where(
+      and(
+        eq(applications.current_status_id, applied.id),
+        eq(applications.archived, 0),
+        lt(applications.last_activity_at, cutoff)
+      )
+    )
+
+  if (stale.length === 0) return 0
+
+  const now = Date.now()
+  for (const app of stale) {
+    await db
+      .update(applications)
+      .set({ current_status_id: ghosted.id, last_activity_at: now, updated_at: now })
+      .where(eq(applications.id, app.id))
+    await db.insert(application_status_history).values({
+      id: uuidv7(),
+      application_id: app.id,
+      status_id: ghosted.id,
+      changed_at: now,
+      source: 'system',
+      note: 'Auto-ghosted after 3 weeks with no response.',
+    })
+  }
+
+  return stale.length
+}
+
 export async function deleteApplication(id: string): Promise<void> {
   const db = getDb()
   await db.delete(applications).where(eq(applications.id, id))
