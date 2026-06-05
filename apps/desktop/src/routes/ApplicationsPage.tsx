@@ -18,17 +18,24 @@ export function ApplicationsPage() {
     setSearchQuery,
     setShowArchived,
   } = useUiStore()
+  const [showFollowUp, setShowFollowUp] = useState(false)
 
   const statusesQuery = trpc.statuses.list.useQuery()
-  const applicationsQuery = trpc.applications.list.useQuery({
-    status_ids: statusFilter.length > 0 ? statusFilter : undefined,
-    source: (sourceFilter as never) || undefined,
-    query: searchQuery || undefined,
-    archived: showArchived,
-  })
+  const applicationsQuery = trpc.applications.list.useQuery(
+    {
+      status_ids: statusFilter.length > 0 ? statusFilter : undefined,
+      source: (sourceFilter as never) || undefined,
+      query: searchQuery || undefined,
+      archived: showArchived,
+    },
+    { enabled: !showFollowUp }
+  )
+  const staleQuery = trpc.applications.stale.useQuery(7, { enabled: showFollowUp })
 
   const statuses = statusesQuery.data ?? []
-  const applications = applicationsQuery.data ?? []
+  const applications = showFollowUp
+    ? (staleQuery.data ?? [])
+    : (applicationsQuery.data ?? [])
 
   return (
     <div className="flex h-full min-w-0 overflow-hidden">
@@ -106,6 +113,18 @@ export function ApplicationsPage() {
             <option value="manual">Manual</option>
             <option value="other">Other</option>
           </select>
+
+          <button
+            type="button"
+            onClick={() => setShowFollowUp(!showFollowUp)}
+            className={`text-xs px-2.5 py-0.5 rounded-full border transition-all whitespace-nowrap ${
+              showFollowUp
+                ? 'bg-amber-500 text-white border-amber-500'
+                : 'border-amber-500 text-amber-600 hover:bg-amber-50'
+            }`}
+          >
+            Needs follow-up
+          </button>
 
           <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap">
             <input

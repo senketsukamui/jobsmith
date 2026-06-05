@@ -7,6 +7,8 @@ import {
   ChangeStatusInput,
   ListApplicationsInput,
   CreateCompanyInput,
+  CreateStatusInput,
+  UpdateStatusInput,
 } from '@job-tracker/shared'
 import * as ApplicationService from '../services/applications'
 import * as CompanyService from '../services/companies'
@@ -18,6 +20,7 @@ import * as SettingsService from '../services/settings'
 import * as PairingService from '../services/pairing'
 import * as GmailService from '../services/gmail'
 import * as EmailScannerService from '../services/emailScanner'
+import { updateBadgeCount } from '../services/notifications'
 
 const t = initTRPC.create({ isServer: true })
 const router = t.router
@@ -47,6 +50,14 @@ const applicationsRouter = router({
   history: procedure.input(z.string()).query(({ input }) =>
     ApplicationService.getApplicationHistory(input)
   ),
+  archive: procedure
+    .input(z.object({ id: z.string(), archived: z.number().int().min(0).max(1) }))
+    .mutation(({ input }) =>
+      ApplicationService.updateApplication({ id: input.id, archived: input.archived })
+    ),
+  stale: procedure.input(z.number().optional()).query(({ input }) =>
+    ApplicationService.getStaleApplications(input ?? 7)
+  ),
 })
 
 // ─── Companies ────────────────────────────────────────────────────────────────
@@ -64,6 +75,18 @@ const companiesRouter = router({
 
 const statusesRouter = router({
   list: procedure.query(() => StatusService.listStatuses()),
+  create: procedure.input(CreateStatusInput).mutation(({ input }) =>
+    StatusService.createStatus(input)
+  ),
+  update: procedure.input(UpdateStatusInput).mutation(({ input }) =>
+    StatusService.updateStatus(input)
+  ),
+  delete: procedure.input(z.string()).mutation(({ input }) =>
+    StatusService.deleteStatus(input)
+  ),
+  reorder: procedure.input(z.array(z.string())).mutation(({ input }) =>
+    StatusService.reorderStatuses(input)
+  ),
 })
 
 // ─── CVs ──────────────────────────────────────────────────────────────────────
@@ -205,6 +228,7 @@ const emailsRouter = router({
     .mutation(({ input }) =>
       EmailScannerService.linkEmailToApplication(input.emailId, input.applicationId)
     ),
+  syncBadge: procedure.mutation(() => updateBadgeCount()),
 })
 
 // ─── App router ───────────────────────────────────────────────────────────────

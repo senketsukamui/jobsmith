@@ -405,6 +405,302 @@ function PairingSection() {
   )
 }
 
+// ─── Statuses ─────────────────────────────────────────────────────────────────
+
+function StatusesSection() {
+  const queryClient = useQueryClient()
+  const statusesQuery = trpc.statuses.list.useQuery()
+  const statuses = statusesQuery.data ?? []
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editColor, setEditColor] = useState('#94a3b8')
+  const [editTerminal, setEditTerminal] = useState(0)
+  const [editDefault, setEditDefault] = useState(0)
+
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newColor, setNewColor] = useState('#94a3b8')
+  const [newTerminal, setNewTerminal] = useState(false)
+
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  const createMutation = trpc.statuses.create.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries()
+      setCreating(false)
+      setNewName('')
+      setNewColor('#94a3b8')
+      setNewTerminal(false)
+    },
+  })
+
+  const updateMutation = trpc.statuses.update.useMutation({
+    onSuccess: () => {
+      queryClient.invalidateQueries()
+      setEditingId(null)
+    },
+  })
+
+  const deleteMutation = trpc.statuses.delete.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+    onError: (err) => setDeleteError(err.message),
+  })
+
+  const reorderMutation = trpc.statuses.reorder.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+
+  function startEdit(s: typeof statuses[number]) {
+    setEditingId(s.id)
+    setEditName(s.name)
+    setEditColor(s.color)
+    setEditTerminal(s.is_terminal)
+    setEditDefault(s.is_default_new)
+  }
+
+  function moveStatus(id: string, direction: -1 | 1) {
+    const idx = statuses.findIndex((s) => s.id === id)
+    if (idx < 0) return
+    const newIdx = idx + direction
+    if (newIdx < 0 || newIdx >= statuses.length) return
+    const ids = statuses.map((s) => s.id)
+    const tmp = ids[idx]
+    ids[idx] = ids[newIdx]
+    ids[newIdx] = tmp
+    reorderMutation.mutate(ids)
+  }
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Statuses</h2>
+
+      {deleteError && (
+        <p className="text-xs text-destructive bg-destructive/10 rounded-md px-3 py-2">
+          {deleteError}{' '}
+          <button type="button" className="underline" onClick={() => setDeleteError(null)}>Dismiss</button>
+        </p>
+      )}
+
+      <div className="space-y-1.5">
+        {statuses.map((s, idx) => (
+          <div key={s.id} className="rounded-md border border-border bg-card">
+            {editingId === s.id ? (
+              <div className="p-3 space-y-3">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={editColor}
+                    onChange={(e) => setEditColor(e.target.value)}
+                    className="w-8 h-8 rounded cursor-pointer border-0"
+                  />
+                  <input
+                    autoFocus
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editTerminal === 1}
+                      onChange={(e) => setEditTerminal(e.target.checked ? 1 : 0)}
+                    />
+                    Terminal (end state)
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editDefault === 1}
+                      onChange={(e) => setEditDefault(e.target.checked ? 1 : 0)}
+                    />
+                    Default for new applications
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => updateMutation.mutate({
+                      id: s.id, name: editName, color: editColor,
+                      is_terminal: editTerminal, is_default_new: editDefault,
+                    })}
+                    disabled={updateMutation.isLoading || !editName.trim()}
+                    className="h-7 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(null)}
+                    className="h-7 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3 py-2">
+                <div
+                  className="w-3 h-3 rounded-full shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span className="flex-1 text-sm">{s.name}</span>
+                {s.is_terminal === 1 && (
+                  <span className="text-xs text-muted-foreground">terminal</span>
+                )}
+                {s.is_default_new === 1 && (
+                  <span className="text-xs text-muted-foreground">default</span>
+                )}
+                <div className="flex items-center gap-1 ml-1">
+                  <button
+                    type="button"
+                    onClick={() => moveStatus(s.id, -1)}
+                    disabled={idx === 0}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 px-0.5"
+                    title="Move up"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveStatus(s.id, 1)}
+                    disabled={idx === statuses.length - 1}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30 px-0.5"
+                    title="Move down"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => startEdit(s)}
+                    className="text-xs text-muted-foreground hover:text-foreground underline ml-1"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteError(null)
+                      if (confirm(`Delete status "${s.name}"?`)) {
+                        deleteMutation.mutate(s.id)
+                      }
+                    }}
+                    className="text-xs text-destructive hover:text-destructive/80 underline"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {creating ? (
+        <div className="rounded-md border border-border p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={newColor}
+              onChange={(e) => setNewColor(e.target.value)}
+              className="w-8 h-8 rounded cursor-pointer border-0"
+            />
+            <input
+              autoFocus
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="Status name"
+              className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+            <input
+              type="checkbox"
+              checked={newTerminal}
+              onChange={(e) => setNewTerminal(e.target.checked)}
+            />
+            Terminal (end state)
+          </label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => createMutation.mutate({ name: newName, color: newColor, is_terminal: newTerminal ? 1 : 0 })}
+              disabled={createMutation.isLoading || !newName.trim()}
+              className="h-7 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreating(false)}
+              className="h-7 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setCreating(true)}
+          className="text-sm text-primary hover:underline"
+        >
+          + Add status
+        </button>
+      )}
+    </section>
+  )
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+function NotificationsSection() {
+  const queryClient = useQueryClient()
+  const settingsQuery = trpc.settings.getAll.useQuery()
+  const setSetting = trpc.settings.set.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+
+  const notifEnabled = settingsQuery.data?.notification_enabled !== '0'
+  const followUpDays = settingsQuery.data?.follow_up_days ?? '7'
+
+  return (
+    <section className="space-y-4">
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Notifications & Reminders</h2>
+      <div className="space-y-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={notifEnabled}
+            onChange={(e) =>
+              setSetting.mutate({ key: 'notification_enabled', value: e.target.checked ? '1' : '0' })
+            }
+          />
+          <span className="text-sm">Enable OS notifications</span>
+        </label>
+        <div className="space-y-1.5">
+          <label className="text-sm font-medium">Follow-up reminder threshold (days)</label>
+          <input
+            type="number"
+            min={1}
+            max={60}
+            defaultValue={followUpDays}
+            onBlur={(e) => setSetting.mutate({ key: 'follow_up_days', value: e.target.value })}
+            className="w-24 h-8 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          />
+          <p className="text-xs text-muted-foreground">
+            Applications with no activity for this many days will be flagged under "Needs follow-up".
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export function SettingsPage() {
   return (
     <div className="flex flex-col h-full overflow-auto">
@@ -415,6 +711,8 @@ export function SettingsPage() {
         <OllamaSection />
         <GmailSection />
         <CvsSection />
+        <StatusesSection />
+        <NotificationsSection />
         <PairingSection />
       </div>
     </div>

@@ -70,6 +70,10 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
     onSuccess: () => queryClient.invalidateQueries(),
   })
 
+  const archiveMutation = trpc.applications.archive.useMutation({
+    onSuccess: () => queryClient.invalidateQueries(),
+  })
+
   const app = appQuery.data
   const coverLetters = coverLettersQuery.data ?? []
 
@@ -101,13 +105,24 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
             <p className="text-xs text-muted-foreground truncate">{app.company?.name ?? ''}</p>
             <h2 className="text-sm font-semibold leading-tight truncate">{app.role_title}</h2>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 text-muted-foreground hover:text-foreground leading-none text-base"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => archiveMutation.mutate({ id: app.id, archived: app.archived ? 0 : 1 })}
+              disabled={archiveMutation.isLoading}
+              className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+              title={app.archived ? 'Unarchive' : 'Archive'}
+            >
+              {app.archived ? 'Unarchive' : 'Archive'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="text-muted-foreground hover:text-foreground leading-none text-base"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Scrollable body */}

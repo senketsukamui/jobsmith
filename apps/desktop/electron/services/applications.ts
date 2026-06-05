@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, like, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, like, lt, or } from 'drizzle-orm'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import {
@@ -155,6 +155,29 @@ export async function changeStatus(
 
   const result = await getApplication(input.id)
   return result!
+}
+
+export async function getStaleApplications(
+  thresholdDays: number
+): Promise<ApplicationWithRelations[]> {
+  const db = getDb()
+  const cutoff = Date.now() - thresholdDays * 24 * 60 * 60 * 1000
+
+  const rows = await db
+    .select({ application: applications, company: companies, status: statuses })
+    .from(applications)
+    .innerJoin(companies, eq(applications.company_id, companies.id))
+    .innerJoin(statuses, eq(applications.current_status_id, statuses.id))
+    .where(
+      and(
+        eq(applications.archived, 0),
+        eq(statuses.is_terminal, 0),
+        lt(applications.last_activity_at, cutoff)
+      )
+    )
+    .orderBy(desc(applications.last_activity_at))
+
+  return rows.map((r) => ({ ...r.application, company: r.company, status: r.status }))
 }
 
 export async function deleteApplication(id: string): Promise<void> {

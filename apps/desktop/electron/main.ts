@@ -12,6 +12,7 @@ import { appRouter } from './ipc/router'
 import { startHttpServer } from './services/httpServer'
 import { getOrCreatePairingToken } from './services/pairing'
 import { startScheduler } from './services/scheduler'
+import { updateBadgeCount } from './services/notifications'
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,9 @@ app.whenReady().then(async () => {
 
   // Start email scan scheduler
   await startScheduler()
+
+  // Set initial dock badge
+  updateBadgeCount().catch(() => {})
 
   createWindow()
   createTray()

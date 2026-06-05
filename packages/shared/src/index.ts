@@ -200,3 +200,19 @@ export const CreateCompanyInput = z.object({
   notes: z.string().optional(),
 })
 export type CreateCompanyInput = z.infer<typeof CreateCompanyInput>
+
+export const CreateStatusInput = z.object({
+  name: z.string().min(1),
+  color: z.string().optional(),
+  is_terminal: z.number().int().min(0).max(1).optional(),
+})
+export type CreateStatusInput = z.infer<typeof CreateStatusInput>
+
+export const UpdateStatusInput = z.object({
+  id: z.string(),
+  name: z.string().min(1).optional(),
+  color: z.string().optional(),
+  is_terminal: z.number().int().min(0).max(1).optional(),
+  is_default_new: z.number().int().min(0).max(1).optional(),
+})
+export type UpdateStatusInput = z.infer<typeof UpdateStatusInput>
