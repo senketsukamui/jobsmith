@@ -1,9 +1,14 @@
 import { google, gmail_v1 } from 'googleapis'
 import { safeStorage, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
+import { getHttpServerPort } from './httpServer'
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
-const REDIRECT_URI = 'jobsmith://oauth/gmail/callback'
+
+function getRedirectUri(): string {
+  const port = getHttpServerPort() ?? 53700
+  return `http://127.0.0.1:${port}/api/oauth/callback`
+}
 
 const CREDS_KEY = 'gmail_credentials_encrypted'
 const HISTORY_KEY = 'gmail_last_history_id'
@@ -39,7 +44,7 @@ async function buildOAuth2Client(withTokens = false) {
   const clientId = process.env['GOOGLE_CLIENT_ID'] ?? (await getSetting('google_client_id')) ?? ''
   const clientSecret = process.env['GOOGLE_CLIENT_SECRET'] ?? (await getSetting('google_client_secret')) ?? ''
 
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI)
+  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, getRedirectUri())
 
   if (withTokens) {
     const stored = await getSetting(CREDS_KEY)

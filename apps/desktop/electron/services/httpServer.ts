@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { app } from 'electron'
 import { validateToken } from './pairing'
+import { handleOAuthCallback } from './gmail'
 import * as ApplicationService from './applications'
 import * as CompanyService from './companies'
 import * as StatusService from './statuses'
@@ -11,6 +12,12 @@ import { CreateApplicationInput } from '@job-tracker/shared'
 
 const PORT_MIN = 53700
 const PORT_MAX = 53800
+
+let _port: number | null = null
+
+export function getHttpServerPort(): number | null {
+  return _port
+}
 
 function discoveryFilePath(): string {
   return path.join(app.getPath('userData'), 'server.json')
@@ -56,6 +63,22 @@ export async function startHttpServer(): Promise<number> {
     status: 'ok',
     version: app.getVersion(),
   }))
+
+  // ── OAuth callback (no auth — called by Google redirect) ────────────────────
+
+  server.get('/api/oauth/callback', async (req, reply) => {
+    const { code, error } = req.query as { code?: string; error?: string }
+    if (error || !code) {
+      reply.type('text/html').send('<p>OAuth error. You can close this tab.</p>')
+      return
+    }
+    try {
+      await handleOAuthCallback(code)
+      reply.type('text/html').send('<p>Gmail connected! You can close this tab and return to the app.</p>')
+    } catch (err) {
+      reply.type('text/html').send(`<p>Error: ${String(err)}</p>`)
+    }
+  })
 
   // ── Applications ────────────────────────────────────────────────────────────
 
@@ -149,6 +172,7 @@ export async function startHttpServer(): Promise<number> {
     try {
       await server.listen({ port, host: '127.0.0.1' })
       writeDiscoveryFile(port)
+      _port = port
       return port
     } catch {
       if (port === PORT_MAX) throw new Error('No available port in range 53700-53800')

@@ -11,7 +11,6 @@ import { runMigrations } from './db/migrate'
 import { appRouter } from './ipc/router'
 import { startHttpServer } from './services/httpServer'
 import { getOrCreatePairingToken } from './services/pairing'
-import { handleOAuthCallback } from './services/gmail'
 import { startScheduler } from './services/scheduler'
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
@@ -128,22 +127,6 @@ function createTray() {
     }
   })
 }
-
-// ─── Deep link (OAuth callback) ───────────────────────────────────────────────
-
-if (process.defaultApp) {
-  if (process.argv.length >= 2) app.setAsDefaultProtocolClient('jobsmith', process.execPath, [path.resolve(process.argv[1])])
-} else {
-  app.setAsDefaultProtocolClient('jobsmith')
-}
-
-app.on('open-url', (_event, url) => {
-  const parsed = new URL(url)
-  if (parsed.pathname === '/oauth/gmail/callback') {
-    const code = parsed.searchParams.get('code')
-    if (code) handleOAuthCallback(code).catch(console.error)
-  }
-})
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 
