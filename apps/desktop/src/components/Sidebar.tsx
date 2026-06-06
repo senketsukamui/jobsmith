@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc'
 
@@ -8,7 +9,23 @@ interface SidebarProps {
   onNavigate: (page: Page) => void
 }
 
+function useDarkMode() {
+  const [dark, setDark] = useState(() => {
+    return localStorage.getItem('theme') === 'dark' ||
+      (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)
+  })
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark)
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
+
+  return [dark, setDark] as const
+}
+
 export function Sidebar({ active, onNavigate }: SidebarProps) {
+  const [dark, setDark] = useDarkMode()
+
   const pendingQuery = trpc.emails.pending.useQuery(undefined, {
     refetchInterval: 60_000,
   })
@@ -22,7 +39,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
 
   return (
     <aside className="flex flex-col w-44 shrink-0 border-r border-border bg-muted/30 pt-10">
-      <nav className="flex flex-col gap-0.5 px-2">
+      <nav className="flex flex-col gap-0.5 px-2 flex-1">
         {NAV.map((item) => (
           <button
             key={item.id}
@@ -45,6 +62,19 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
           </button>
         ))}
       </nav>
+
+      {/* Dark mode toggle */}
+      <div className="px-3 pb-4">
+        <button
+          type="button"
+          onClick={() => setDark((d) => !d)}
+          className="flex items-center gap-2 w-full rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent/60 hover:text-foreground transition-colors"
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          <span className="text-base leading-none">{dark ? '☀️' : '🌙'}</span>
+          <span>{dark ? 'Light mode' : 'Dark mode'}</span>
+        </button>
+      </div>
     </aside>
   )
 }
