@@ -7,6 +7,7 @@ import { ApplicationsPage } from '@/routes/ApplicationsPage'
 import { EmailsPage } from '@/routes/EmailsPage'
 import { SettingsPage } from '@/routes/SettingsPage'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
+import { ToastProvider } from '@/components/Toast'
 
 type Page = 'applications' | 'emails' | 'settings'
 
@@ -42,7 +43,9 @@ export function App() {
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <AppInner />
+        <ToastProvider>
+          <AppInner />
+        </ToastProvider>
       </QueryClientProvider>
     </trpc.Provider>
   )

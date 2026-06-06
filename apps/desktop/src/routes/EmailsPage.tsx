@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc'
 import type { Email } from '@jobsmith/shared'
+import { useToast } from '@/components/Toast'
 
 const CLASSIFICATION_LABELS: Record<string, string> = {
   acknowledgment: 'Acknowledgment',
@@ -240,7 +241,9 @@ function HistoryCard({ email, statuses, apps }: {
 
 export function EmailsPage() {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<'review' | 'history'>('review')
+  const [scanning, setScanning] = useState(false)
 
   const pendingQuery = trpc.emails.pending.useQuery()
   const historyQuery = trpc.emails.history.useQuery()
@@ -248,8 +251,27 @@ export function EmailsPage() {
   const applicationsQuery = trpc.applications.list.useQuery({})
 
   const scanMutation = trpc.emails.scanNow.useMutation({
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries()
+      setScanning(false)
+      const result = data as { scanned: number; newMatches: number; autoApplied: number }
+      const parts: string[] = [`${result.scanned} messages checked`]
+      if (result.autoApplied > 0)
+        parts.push(`${result.autoApplied} status update${result.autoApplied > 1 ? 's' : ''} applied`)
+      if (result.newMatches > 0)
+        parts.push(`${result.newMatches} need${result.newMatches > 1 ? '' : 's'} review`)
+      toast(parts.join(' · '), result.autoApplied > 0 || result.newMatches > 0 ? 'success' : 'default')
+    },
+    onError: (err) => {
+      setScanning(false)
+      toast(err.message ?? 'Scan failed', 'error')
+    },
   })
+
+  function handleScan() {
+    setScanning(true)
+    scanMutation.mutate()
+  }
 
   const pending = pendingQuery.data ?? []
   const history = historyQuery.data ?? []
@@ -265,13 +287,29 @@ export function EmailsPage() {
         <h1 className="text-base font-semibold">Emails</h1>
         <button
           type="button"
-          onClick={() => scanMutation.mutate()}
-          disabled={scanMutation.isLoading}
+          onClick={handleScan}
+          disabled={scanning}
           className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
         >
-          {scanMutation.isLoading ? 'Scanning…' : 'Scan now'}
+          {scanning ? (
+            <>
+              <svg className="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              Scanning…
+            </>
+          ) : 'Scan now'}
         </button>
       </div>
+
+      {/* Scanning indicator */}
+      {scanning && (
+        <div className="flex items-center gap-2 px-6 py-2 border-b border-border shrink-0 bg-primary/5">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary animate-ping" />
+          <span className="text-xs text-primary font-medium animate-pulse">Scanning inbox…</span>
+        </div>
+      )}
 
       {/* Scan result banner */}
       {scanMutation.isSuccess && scanData && (
