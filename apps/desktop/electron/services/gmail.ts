@@ -32,10 +32,21 @@ function encryptCreds(creds: StoredCreds): string {
 
 function decryptCreds(stored: string): StoredCreds {
   const buf = Buffer.from(stored, 'base64')
-  const json = safeStorage.isEncryptionAvailable()
-    ? safeStorage.decryptString(buf)
-    : buf.toString('utf-8')
-  return JSON.parse(json) as StoredCreds
+
+  if (safeStorage.isEncryptionAvailable()) {
+    try {
+      return JSON.parse(safeStorage.decryptString(buf)) as StoredCreds
+    } catch {
+      // Credentials were encrypted under a different app identity (e.g. after rename).
+      // Clear the stale value so the user is prompted to reconnect.
+      setSetting(CREDS_KEY, '').catch(() => {})
+      setSetting(CONNECTED_KEY, '0').catch(() => {})
+      throw new Error('Gmail credentials are no longer valid after the app was renamed. Please reconnect Gmail in Settings.')
+    }
+  }
+
+  // safeStorage unavailable — stored as plain base64 JSON
+  return JSON.parse(buf.toString('utf-8')) as StoredCreds
 }
 
 // ─── OAuth client factory ─────────────────────────────────────────────────────

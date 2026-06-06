@@ -30,7 +30,13 @@ async function storeToken(plain: string): Promise<void> {
 
 export async function getOrCreatePairingToken(): Promise<string> {
   const stored = await getSetting(PLAIN_KEY)
-  if (stored) return decryptToken(stored)
+  if (stored) {
+    try {
+      return decryptToken(stored)
+    } catch {
+      // Encrypted under a different app identity (e.g. after a rename) — regenerate
+    }
+  }
 
   const plain = randomBytes(24).toString('base64url')
   await storeToken(plain)
