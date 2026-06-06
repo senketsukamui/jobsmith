@@ -15,6 +15,13 @@
       "when": 1780668142070,
       "tag": "0001_jazzy_ink",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1749168000000,
+      "tag": "0002_add_notes_to_applications",
+      "breakpoints": true
     }
   ]
 }

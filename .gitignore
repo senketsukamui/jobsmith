@@ -7,3 +7,6 @@ dist-electron/
 .DS_Store
 *.log
 release/
+.env
+.env.*
+!.env.example

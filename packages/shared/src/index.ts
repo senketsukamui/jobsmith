@@ -68,6 +68,7 @@ export const ApplicationSchema = z.object({
   current_status_id: z.string(),
   applied_at: z.number().nullable(),
   last_activity_at: z.number().nullable(),
+  notes: z.string().nullable(),
   page_markdown: z.string().nullable(),
   archived: z.number(),
   created_at: z.number(),
@@ -175,6 +176,8 @@ export const UpdateApplicationInput = z.object({
   source: ApplicationSourceSchema.optional(),
   cv_id: z.string().nullable().optional(),
   archived: z.number().optional(),
+  applied_at: z.number().nullable().optional(),
+  notes: z.string().nullable().optional(),
 })
 export type UpdateApplicationInput = z.infer<typeof UpdateApplicationInput>
 

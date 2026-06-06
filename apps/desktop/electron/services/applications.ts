@@ -131,6 +131,8 @@ export async function updateApplication(
   if (input.source !== undefined) patch.source = input.source
   if (input.cv_id !== undefined) patch.cv_id = input.cv_id
   if (input.archived !== undefined) patch.archived = input.archived
+  if (input.applied_at !== undefined) patch.applied_at = input.applied_at
+  if (input.notes !== undefined) patch.notes = input.notes
 
   await db.update(applications).set(patch).where(eq(applications.id, input.id))
   const result = await getApplication(input.id)

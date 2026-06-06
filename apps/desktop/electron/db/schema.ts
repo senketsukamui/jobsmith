@@ -55,6 +55,7 @@ export const applications = sqliteTable(
       .references(() => statuses.id),
     applied_at: integer('applied_at'),
     last_activity_at: integer('last_activity_at'),
+    notes: text('notes'),
     page_markdown: text('page_markdown'),
     archived: integer('archived').notNull().default(0),
     created_at: integer('created_at').notNull(),
