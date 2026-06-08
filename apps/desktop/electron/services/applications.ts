@@ -256,11 +256,13 @@ export async function parseApplicationMarkdown(
     raw += token
   }
 
-  const parsed = JSON.parse(raw) as ParsedMarkdownFields
+  const parsed = JSON.parse(raw) as Record<string, unknown>
+  const coerce = (v: unknown): string =>
+    Array.isArray(v) ? v.join('\n') : typeof v === 'string' ? v : ''
   return {
-    company_name: parsed.company_name ?? '',
-    role_title: parsed.role_title ?? '',
-    job_description: parsed.job_description ?? '',
+    company_name: coerce(parsed.company_name),
+    role_title: coerce(parsed.role_title),
+    job_description: coerce(parsed.job_description),
   }
 }
 
