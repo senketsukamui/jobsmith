@@ -242,6 +242,178 @@ function CvsSection() {
   )
 }
 
+function OAuthCredentialRow({
+  label,
+  settingKey,
+  savedValue,
+  setSetting,
+  secret,
+}: {
+  label: string
+  settingKey: string
+  savedValue: string
+  setSetting: ReturnType<typeof trpc.settings.set.useMutation>
+  secret: boolean
+}) {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState('')
+
+  if (!editing) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-muted-foreground w-28 shrink-0">{label}</span>
+        <span className="flex-1 text-xs font-mono truncate text-muted-foreground">
+          {savedValue ? (secret ? '●●●●●●●●●●●●' : `${savedValue.slice(0, 12)}…`) : 'Not set'}
+        </span>
+        <button type="button" onClick={() => { setValue(''); setEditing(true) }} className="text-xs text-primary hover:underline shrink-0">
+          {savedValue ? 'Update' : 'Set'}
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex gap-2">
+      <input
+        autoFocus
+        type={secret ? 'password' : 'text'}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={label}
+        className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+      />
+      <button
+        type="button"
+        disabled={!value.trim() || setSetting.isLoading}
+        onClick={() => {
+          setSetting.mutate({ key: settingKey, value: value.trim() }, { onSuccess: () => setEditing(false) })
+        }}
+        className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
+      >
+        Save
+      </button>
+      <button type="button" onClick={() => setEditing(false)} className="h-8 px-3 rounded-md border border-input text-xs hover:bg-accent">
+        Cancel
+      </button>
+    </div>
+  )
+}
+
+function SyncSection() {
+  const queryClient = useQueryClient()
+  const syncQuery = trpc.sync.get.useQuery()
+  const [syncUrl, setSyncUrl] = useState('')
+  const [authToken, setAuthToken] = useState('')
+  const [testResult, setTestResult] = useState<{ ok: boolean; error?: string } | null>(null)
+
+  const testMutation = trpc.sync.test.useMutation({
+    onSuccess: (data) => setTestResult(data),
+  })
+  const setMutation = trpc.sync.set.useMutation({
+    onSuccess: () => { queryClient.invalidateQueries(); setSyncUrl(''); setAuthToken(''); setTestResult(null) },
+  })
+  const clearMutation = trpc.sync.clear.useMutation({
+    onSuccess: () => { queryClient.invalidateQueries(); setTestResult(null) },
+  })
+  const syncNowMutation = trpc.sync.syncNow.useMutation()
+
+  const current = syncQuery.data
+
+  return (
+    <section className="space-y-4">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Sync</h2>
+        <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Experimental</span>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        Uses libSQL embedded replica to sync your local database to a remote{' '}
+        <span className="font-medium">Turso</span> database. The app works fully offline; sync runs every 5 minutes when active.
+        A restart is required after changing these settings.
+      </p>
+
+      {current?.active ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500" />
+            <span className="text-sm font-medium">Sync active</span>
+          </div>
+          <p className="text-xs text-muted-foreground font-mono break-all">{current.syncUrl}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => syncNowMutation.mutate()}
+              disabled={syncNowMutation.isLoading}
+              className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent disabled:opacity-50 transition-colors"
+            >
+              {syncNowMutation.isLoading ? 'Syncing…' : 'Sync now'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { if (confirm('Disable sync? The local database will remain intact. A restart is required.')) clearMutation.mutate() }}
+              disabled={clearMutation.isLoading}
+              className="h-8 inline-flex items-center justify-center rounded-md border border-destructive/50 text-destructive px-3 text-xs hover:bg-destructive/10 disabled:opacity-50 transition-colors"
+            >
+              Disable sync
+            </button>
+          </div>
+          {syncNowMutation.isSuccess && <p className="text-xs text-green-600">Sync complete.</p>}
+          {syncNowMutation.isError && <p className="text-xs text-destructive">{syncNowMutation.error?.message}</p>}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Turso database URL</label>
+            <input
+              type="url"
+              value={syncUrl}
+              onChange={(e) => { setSyncUrl(e.target.value); setTestResult(null) }}
+              placeholder="libsql://your-db-name.turso.io"
+              className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm font-mono placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Auth token</label>
+            <input
+              type="password"
+              value={authToken}
+              onChange={(e) => { setAuthToken(e.target.value); setTestResult(null) }}
+              placeholder="eyJ…"
+              className="w-full h-9 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            />
+          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              disabled={!syncUrl.trim() || !authToken.trim() || testMutation.isLoading}
+              onClick={() => { setTestResult(null); testMutation.mutate({ syncUrl: syncUrl.trim(), authToken: authToken.trim() }) }}
+              className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent disabled:opacity-50 transition-colors"
+            >
+              {testMutation.isLoading ? 'Testing…' : 'Test connection'}
+            </button>
+            <button
+              type="button"
+              disabled={!syncUrl.trim() || !authToken.trim() || setMutation.isLoading}
+              onClick={() => setMutation.mutate({ syncUrl: syncUrl.trim(), authToken: authToken.trim() })}
+              className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {setMutation.isLoading ? 'Saving…' : 'Enable sync'}
+            </button>
+            {testResult && (
+              <span className={`text-xs ${testResult.ok ? 'text-green-600' : 'text-destructive'}`}>
+                {testResult.ok ? 'Connection successful' : `Error: ${testResult.error}`}
+              </span>
+            )}
+            {setMutation.isSuccess && (
+              <span className="text-xs text-green-600">Saved — restart the app to activate sync.</span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function GmailSection() {
   const queryClient = useQueryClient()
   const connectedQuery = trpc.gmail.isConnected.useQuery()
@@ -292,33 +464,38 @@ function GmailSection() {
         )}
       </div>
 
-      {!isConnected && (
-        <div className="space-y-1.5">
-          <p className="text-xs text-muted-foreground">
-            You need a Google OAuth client ID and secret. Set them as environment variables
-            <code className="mx-1 px-1 py-0.5 bg-muted rounded text-[11px]">GOOGLE_CLIENT_ID</code>
-            and
-            <code className="mx-1 px-1 py-0.5 bg-muted rounded text-[11px]">GOOGLE_CLIENT_SECRET</code>
-            before launching, or store them in settings below.
-          </p>
-          <div className="space-y-2">
-            {(['google_client_id', 'google_client_secret'] as const).map((key) => (
-              <div key={key} className="flex gap-2">
-                <input
-                  type={key === 'google_client_secret' ? 'password' : 'text'}
-                  placeholder={key === 'google_client_id' ? 'Google Client ID' : 'Google Client Secret'}
-                  onBlur={(e) => {
-                    if (e.target.value.trim()) {
-                      setSetting.mutate({ key, value: e.target.value.trim() })
-                    }
-                  }}
-                  className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* OAuth credentials — always visible so they can be updated any time */}
+      <div className="space-y-2">
+        <p className="text-xs text-muted-foreground">
+          Requires a Google OAuth client.{' '}
+          <a
+            href="https://console.cloud.google.com/apis/credentials"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline"
+            onClick={(e) => { e.preventDefault(); window.open('https://console.cloud.google.com/apis/credentials') }}
+          >
+            Create one in Google Cloud Console
+          </a>{' '}
+          (Desktop app type, redirect URI{' '}
+          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">http://127.0.0.1:PORT/api/oauth/callback</code>),
+          then paste below. Credentials are encrypted with the system keychain.
+        </p>
+        <OAuthCredentialRow
+          label="Client ID"
+          settingKey="google_client_id"
+          savedValue={settingsQuery.data?.google_client_id ?? ''}
+          setSetting={setSetting}
+          secret={false}
+        />
+        <OAuthCredentialRow
+          label="Client Secret"
+          settingKey="google_client_secret"
+          savedValue={settingsQuery.data?.google_client_secret ?? ''}
+          setSetting={setSetting}
+          secret
+        />
+      </div>
 
       {isConnected && (
         <div className="space-y-1.5">
@@ -814,6 +991,7 @@ export function SettingsPage() {
       <div className="flex-1 px-6 py-6 space-y-10 max-w-2xl">
         <OllamaSection />
         <GmailSection />
+        <SyncSection />
         <CvsSection />
         <StatusesSection />
         <NotificationsSection />
