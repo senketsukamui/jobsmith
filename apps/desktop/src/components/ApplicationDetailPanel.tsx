@@ -55,12 +55,24 @@ function ParseReviewModal({ applicationId, parsed, onClose }: {
   onClose: () => void
 }) {
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const [role, setRole] = useState(parsed.role_title)
   const [desc, setDesc] = useState(parsed.job_description)
+  const [error, setError] = useState<string | null>(null)
 
   const updateMutation = trpc.applications.update.useMutation({
-    onSuccess: () => { queryClient.invalidateQueries(); onClose() },
+    onSuccess: () => { queryClient.invalidateQueries(); toast('Application updated', 'success'); onClose() },
+    onError: (err) => setError(err.message ?? 'Save failed'),
   })
+
+  function handleSave() {
+    setError(null)
+    updateMutation.mutate({
+      id: applicationId,
+      role_title: role.trim() || undefined,
+      job_description: desc || undefined,
+    })
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
@@ -83,9 +95,10 @@ function ParseReviewModal({ applicationId, parsed, onClose }: {
           <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job description</label>
           <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={8} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" />
         </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
         <div className="flex gap-2 justify-end pt-1">
           <button type="button" onClick={onClose} className="h-8 inline-flex items-center justify-center rounded-md border border-input px-3 text-xs hover:bg-accent">Discard</button>
-          <button type="button" onClick={() => updateMutation.mutate({ id: applicationId, role_title: role || undefined, job_description: desc || undefined })} disabled={updateMutation.isLoading || (!role.trim() && !desc.trim())} className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+          <button type="button" onClick={handleSave} disabled={updateMutation.isLoading} className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
             {updateMutation.isLoading ? 'Saving…' : 'Save'}
           </button>
         </div>
