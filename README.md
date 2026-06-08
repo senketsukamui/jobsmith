@@ -8,6 +8,7 @@ A local-first Electron desktop app for tracking job applications. Scans your Gma
 - **Gmail integration** — OAuth-based delta scan, LLM email classification, auto-apply confident status changes
 - **Cover letter generation** — Ollama-powered, streamed, editable, per-application history
 - **Chrome extension** — one-click page capture from any job board, bearer-token pairing
+- **Stats dashboard** — funnel chart, weekly trend, response rate, source breakdown, time-to-rejection/interview
 - **Export** — CSV download, Notion push
 - **Sync** *(experimental)* — libSQL embedded replica via Turso for multi-device use
 - **Dark mode** — persisted to localStorage
@@ -19,7 +20,6 @@ A local-first Electron desktop app for tracking job applications. Scans your Gma
 | Node 20+ | via `nvm` or `fnm` |
 | pnpm 9+ | `npm i -g pnpm` |
 | [Ollama](https://ollama.com) | running locally on port 11434 |
-| Google OAuth credentials | see below |
 
 ## Setup
 
@@ -29,34 +29,34 @@ cd jobsmith
 pnpm install
 ```
 
-### Google OAuth credentials (required for Gmail)
+### Google OAuth credentials (for Gmail — developers only)
 
-Gmail scanning requires a Google OAuth 2.0 Desktop client. You only need to do this once.
+> **End users** downloading a pre-built binary don't need to do anything here — Gmail just works.
 
-1. Open [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials)
-2. Create a project (or pick an existing one)
-3. Enable the **Gmail API** for the project
-4. Click **Create credentials → OAuth client ID**
-5. Choose **Desktop app** as the application type
-6. Add the redirect URI:
-   ```
-   http://127.0.0.1:53700/api/oauth/callback
-   ```
-   *(The port is chosen randomly at runtime; add a few common ones like 53700–53710 to be safe, or just add `http://127.0.0.1` as an origin)*
-7. Copy the **Client ID** and **Client Secret**
+If you're running from source, the app needs a Google OAuth client to connect to Gmail. The credentials are baked into the binary at build time from a `.env` file — they are never stored in the repo.
 
-**Option A — environment variables (recommended for development):**
+**1. Create a `.env` file at the repo root:**
 
-Create a `.env` file in `apps/desktop/` (it is gitignored):
+```bash
+cp .env.example .env
+```
+
+**2. Fill in your credentials:**
 
 ```bash
 GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=GOCSPX-your-secret
 ```
 
-**Option B — paste in the app:**
+**3. Get credentials from Google Cloud Console:**
 
-Go to **Settings → Gmail** and enter the credentials there. They are encrypted with the system keychain (macOS Keychain, GNOME Wallet, etc.) before being stored.
+1. Open [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create a project (or pick an existing one) and enable the **Gmail API**
+3. Click **Create credentials → OAuth client ID**
+4. Choose **Desktop app** as the application type, give it a name, click **Create**
+5. Copy the **Client ID** and **Client Secret** into your `.env`
+
+> The app uses PKCE (Proof Key for Code Exchange) so the secret is never sent over the network — it's only used to identify the app to Google. Desktop app clients are considered public by Google's own definition.
 
 ### Pull a local LLM model
 
@@ -64,7 +64,7 @@ Go to **Settings → Gmail** and enter the credentials there. They are encrypted
 ollama pull qwen2.5:3b-instruct
 ```
 
-Any instruction-tuned model works. Larger models (7b, 14b) give better email classification at the cost of speed.
+Any instruction-tuned model works. Larger models (7b, 14b) give better email classification at the cost of speed. The model can be changed in Settings → Ollama.
 
 ### Run the app
 
@@ -78,9 +78,26 @@ The Chrome extension can be loaded unpacked from `apps/extension/dist/` after ru
 pnpm dev:extension
 ```
 
+## Distributing a build
+
+When you run `pnpm build`, the values from your `.env` are baked into the binary at compile time. Anyone who downloads that binary can connect Gmail with one click — no Google Cloud setup required on their end.
+
+```bash
+pnpm build
+# → apps/desktop/dist/  (packaged Electron app)
+```
+
+> **macOS quarantine workaround** — unsigned builds are blocked by Gatekeeper. Recipients can run:
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/Jobsmith.app
+> ```
+> Or right-click → Open → Open anyway.
+
+Code signing and notarization require an Apple Developer account and are not set up in this repo.
+
 ## Sync (experimental)
 
-Jobsmith uses [libSQL](https://github.com/tursodatabase/libsql) as its database engine, which supports **embedded replica mode** — reads and writes go to a local SQLite file, and changes are synced to a remote [Turso](https://turso.tech) database automatically.
+Jobsmith uses [libSQL](https://github.com/tursodatabase/libsql) as its database engine, which supports **embedded replica mode** — reads and writes go to a local SQLite file, and changes sync to a remote [Turso](https://turso.tech) database automatically.
 
 To enable:
 
@@ -89,25 +106,7 @@ To enable:
 3. In Jobsmith → **Settings → Sync**, enter the URL and token and click **Enable sync**
 4. Restart the app
 
-Sync runs every 5 minutes automatically and can be triggered manually from Settings. The app works fully offline; changes sync when connectivity is available.
-
-## Sharing builds (macOS quarantine workaround)
-
-Unsigned macOS builds are quarantined by Gatekeeper. To open a build shared with you:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/Jobsmith.app
-```
-
-Or right-click the app → Open → Open anyway (works once).
-
-## Build
-
-```bash
-pnpm build
-```
-
-This produces a packaged Electron app in `apps/desktop/dist/`. Code signing and notarization require an Apple Developer account and are not set up in this repo.
+Sync runs every 5 minutes automatically and can be triggered manually from Settings.
 
 ## Development commands
 
@@ -127,14 +126,16 @@ pnpm db:migrate        # Apply pending migrations
 - **libSQL** (`@libsql/client`) + **Drizzle ORM** — local SQLite, sync-ready
 - **tRPC** over `electron-trpc` — fully typed IPC between main and renderer
 - **Ollama** — local LLM inference, streamed responses
-- **Gmail API** (googleapis) — OAuth 2.0, History API delta scans
+- **Recharts** — stats dashboard charts
+- **Gmail API** (googleapis) — OAuth 2.0 with PKCE, History API delta scans
 - **Fastify** — local HTTP server for Chrome extension communication
-- **node-cron** — scheduled email scans and reminders
-- **safeStorage** (Electron) — OS keychain encryption for credentials
+- **node-cron** — scheduled email scans
+- **safeStorage** (Electron) — OS keychain encryption for OAuth tokens
 
 ## Security notes
 
 - OAuth tokens and the extension pairing token are encrypted at rest via Electron `safeStorage`
-- The local database is not encrypted (SQLCipher support is a future option)
+- The OAuth flow uses PKCE — no client secret is transmitted during authentication
 - The local HTTP server for the extension binds to `127.0.0.1` only
+- The local database is not encrypted (SQLCipher support is a future option)
 - Never commit your `.env` file — it is gitignored
