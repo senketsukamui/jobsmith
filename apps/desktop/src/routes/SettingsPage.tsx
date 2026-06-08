@@ -260,63 +260,6 @@ function CvsSection() {
   )
 }
 
-function OAuthCredentialRow({
-  label,
-  settingKey,
-  savedValue,
-  setSetting,
-  secret,
-}: {
-  label: string
-  settingKey: string
-  savedValue: string
-  setSetting: ReturnType<typeof trpc.settings.set.useMutation>
-  secret: boolean
-}) {
-  const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState('')
-
-  if (!editing) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-xs text-muted-foreground w-28 shrink-0">{label}</span>
-        <span className="flex-1 text-xs font-mono truncate text-muted-foreground">
-          {savedValue ? (secret ? '●●●●●●●●●●●●' : `${savedValue.slice(0, 12)}…`) : 'Not set'}
-        </span>
-        <button type="button" onClick={() => { setValue(''); setEditing(true) }} className="text-xs text-primary hover:underline shrink-0">
-          {savedValue ? 'Update' : 'Set'}
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex gap-2">
-      <input
-        autoFocus
-        type={secret ? 'password' : 'text'}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={label}
-        className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      />
-      <button
-        type="button"
-        disabled={!value.trim() || setSetting.isLoading}
-        onClick={() => {
-          setSetting.mutate({ key: settingKey, value: value.trim() }, { onSuccess: () => setEditing(false) })
-        }}
-        className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
-      >
-        Save
-      </button>
-      <button type="button" onClick={() => setEditing(false)} className="h-8 px-3 rounded-md border border-input text-xs hover:bg-accent">
-        Cancel
-      </button>
-    </div>
-  )
-}
-
 function SyncSection() {
   const queryClient = useQueryClient()
   const syncQuery = trpc.sync.get.useQuery()
@@ -480,39 +423,9 @@ function GmailSection() {
             Disconnect
           </button>
         )}
-      </div>
-
-      {/* OAuth credentials — always visible so they can be updated any time */}
-      <div className="space-y-2">
-        <p className="text-xs text-muted-foreground">
-          Requires a Google OAuth client.{' '}
-          <a
-            href="https://console.cloud.google.com/apis/credentials"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary hover:underline"
-            onClick={(e) => { e.preventDefault(); window.open('https://console.cloud.google.com/apis/credentials') }}
-          >
-            Create one in Google Cloud Console
-          </a>{' '}
-          (Desktop app type, redirect URI{' '}
-          <code className="px-1 py-0.5 bg-muted rounded text-[11px]">http://127.0.0.1:PORT/api/oauth/callback</code>),
-          then paste below. Credentials are encrypted with the system keychain.
-        </p>
-        <OAuthCredentialRow
-          label="Client ID"
-          settingKey="google_client_id"
-          savedValue={settingsQuery.data?.google_client_id ?? ''}
-          setSetting={setSetting}
-          secret={false}
-        />
-        <OAuthCredentialRow
-          label="Client Secret"
-          settingKey="google_client_secret"
-          savedValue={settingsQuery.data?.google_client_secret ?? ''}
-          setSetting={setSetting}
-          secret
-        />
+        {connectMutation.isError && (
+          <span className="text-xs text-destructive">{connectMutation.error?.message}</span>
+        )}
       </div>
 
       {isConnected && (
