@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc'
+import { JobsmithLogo } from './JobsmithLogo'
 
 type Page = 'applications' | 'stats' | 'emails' | 'settings'
 
@@ -39,7 +40,13 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
   ]
 
   return (
-    <aside className="flex flex-col w-44 shrink-0 border-r border-border bg-muted/30 pt-10">
+    <aside className="flex flex-col w-44 shrink-0 border-r border-border bg-muted/30 pt-8">
+      {/* Logo — sits below macOS traffic lights */}
+      <div className="px-4 pb-3 flex items-center gap-2.5">
+        <JobsmithLogo className="w-7 h-7 shrink-0 rounded-lg shadow-sm" />
+        <span className="text-sm font-bold tracking-tight">Jobsmith</span>
+      </div>
+
       <nav className="flex flex-col gap-0.5 px-2 flex-1">
         {NAV.map((item) => (
           <button

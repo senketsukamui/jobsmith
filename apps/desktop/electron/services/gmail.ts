@@ -1,9 +1,14 @@
+import crypto from 'crypto'
 import { google, gmail_v1 } from 'googleapis'
+import { CodeChallengeMethod } from 'google-auth-library'
 import { safeStorage, shell } from 'electron'
 import { getSetting, setSetting } from './settings'
 import { getHttpServerPort } from './httpServer'
 
 const SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+
+const CLIENT_ID = process.env['GOOGLE_CLIENT_ID'] ?? ''
+const CLIENT_SECRET = process.env['GOOGLE_CLIENT_SECRET'] ?? ''
 
 function getRedirectUri(): string {
   const port = getHttpServerPort() ?? 53700
@@ -13,6 +18,16 @@ function getRedirectUri(): string {
 const CREDS_KEY = 'gmail_credentials_encrypted'
 const HISTORY_KEY = 'gmail_last_history_id'
 const CONNECTED_KEY = 'gmail_connected'
+
+// ─── PKCE ─────────────────────────────────────────────────────────────────────
+
+let _pkceVerifier: string | null = null
+
+function generatePkce(): { verifier: string; challenge: string } {
+  const verifier = crypto.randomBytes(32).toString('base64url')
+  const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
+  return { verifier, challenge }
+}
 
 // ─── Credential storage ───────────────────────────────────────────────────────
 
@@ -38,24 +53,19 @@ function decryptCreds(stored: string): StoredCreds {
       return JSON.parse(safeStorage.decryptString(buf)) as StoredCreds
     } catch {
       // Credentials were encrypted under a different app identity (e.g. after rename).
-      // Clear the stale value so the user is prompted to reconnect.
       setSetting(CREDS_KEY, '').catch(() => {})
       setSetting(CONNECTED_KEY, '0').catch(() => {})
-      throw new Error('Gmail credentials are no longer valid after the app was renamed. Please reconnect Gmail in Settings.')
+      throw new Error('Gmail credentials are no longer valid. Please reconnect Gmail in Settings.')
     }
   }
 
-  // safeStorage unavailable — stored as plain base64 JSON
   return JSON.parse(buf.toString('utf-8')) as StoredCreds
 }
 
 // ─── OAuth client factory ─────────────────────────────────────────────────────
 
 async function buildOAuth2Client(withTokens = false) {
-  const clientId = process.env['GOOGLE_CLIENT_ID'] ?? (await getSetting('google_client_id')) ?? ''
-  const clientSecret = process.env['GOOGLE_CLIENT_SECRET'] ?? (await getSetting('google_client_secret')) ?? ''
-
-  const oauth2 = new google.auth.OAuth2(clientId, clientSecret, getRedirectUri())
+  const oauth2 = new google.auth.OAuth2(CLIENT_ID, CLIENT_SECRET, getRedirectUri())
 
   if (withTokens) {
     const stored = await getSetting(CREDS_KEY)
@@ -66,7 +76,6 @@ async function buildOAuth2Client(withTokens = false) {
         refresh_token: creds.refresh_token,
         expiry_date: creds.expiry_date,
       })
-      // Persist refreshed tokens automatically
       oauth2.on('tokens', async (tokens) => {
         if (tokens.refresh_token || tokens.access_token) {
           const updated: StoredCreds = {
@@ -86,11 +95,16 @@ async function buildOAuth2Client(withTokens = false) {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export async function startOAuthFlow(): Promise<{ authUrl: string }> {
+  const { verifier, challenge } = generatePkce()
+  _pkceVerifier = verifier
+
   const oauth2 = await buildOAuth2Client()
   const authUrl = oauth2.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
     prompt: 'consent',
+    code_challenge: challenge,
+    code_challenge_method: CodeChallengeMethod.S256,
   })
   await shell.openExternal(authUrl)
   return { authUrl }
@@ -98,7 +112,9 @@ export async function startOAuthFlow(): Promise<{ authUrl: string }> {
 
 export async function handleOAuthCallback(code: string): Promise<void> {
   const oauth2 = await buildOAuth2Client()
-  const { tokens } = await oauth2.getToken(code)
+  const { tokens } = await oauth2.getToken({ code, codeVerifier: _pkceVerifier ?? undefined })
+  _pkceVerifier = null
+
   const creds: StoredCreds = {
     access_token: tokens.access_token ?? '',
     refresh_token: tokens.refresh_token ?? '',

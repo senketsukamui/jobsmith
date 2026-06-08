@@ -152,6 +152,14 @@ function createTray() {
 app.whenReady().then(async () => {
   const logger = createLogger()
 
+  // Set dock icon (dev only — packaged builds use the bundle's icon.icns)
+  if (process.platform === 'darwin' && !app.isPackaged) {
+    const dockIconPath = path.join(__dirname, '../assets/icon.png')
+    if (fs.existsSync(dockIconPath)) {
+      app.dock?.setIcon(dockIconPath)
+    }
+  }
+
   try {
     await initDb(logger)
     logger.info('Database initialized')
