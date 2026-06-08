@@ -91,7 +91,16 @@ async function classifyEmail(params: {
       raw += token
     }
     console.log(`[emailScanner] LLM raw output: ${raw.slice(0, 300)}`)
-    const parsed = JSON.parse(raw) as ClassificationResult
+    const raw_parsed = JSON.parse(raw) as Record<string, unknown>
+    const coerceStr = (v: unknown): string =>
+      Array.isArray(v) ? v.join(' ') : typeof v === 'string' ? v : ''
+    const parsed: ClassificationResult = {
+      classification: raw_parsed.classification as EmailClassification,
+      confidence: typeof raw_parsed.confidence === 'number' ? raw_parsed.confidence : 0,
+      company_guess: coerceStr(raw_parsed.company_guess),
+      role_guess: coerceStr(raw_parsed.role_guess),
+      reasoning: coerceStr(raw_parsed.reasoning),
+    }
     console.log(`[emailScanner] classified as ${parsed.classification} (confidence=${parsed.confidence}, company="${parsed.company_guess}", role="${parsed.role_guess}")`)
     return parsed
   } catch (err) {
