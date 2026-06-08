@@ -9,12 +9,19 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "db:generate": "pnpm --filter @jobsmith/desktop db:generate",
-    "db:migrate": "pnpm --filter @jobsmith/desktop db:migrate"
+    "db:migrate": "pnpm --filter @jobsmith/desktop db:migrate",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "typescript": "^5.7.2"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["electron", "esbuild", "@libsql/client", "@libsql/libsql-darwin-arm64"]
+    "onlyBuiltDependencies": [
+      "electron",
+      "esbuild",
+      "@libsql/client",
+      "@libsql/libsql-darwin-arm64"
+    ]
   }
 }
