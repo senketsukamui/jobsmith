@@ -57,6 +57,7 @@ export const applications = sqliteTable(
     last_activity_at: integer('last_activity_at'),
     notes: text('notes'),
     page_markdown: text('page_markdown'),
+    pending_parse: integer('pending_parse').notNull().default(0),
     archived: integer('archived').notNull().default(0),
     created_at: integer('created_at').notNull(),
     updated_at: integer('updated_at').notNull(),

@@ -22,6 +22,13 @@
       "when": 1749168000000,
       "tag": "0002_add_notes_to_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1749254400000,
+      "tag": "0003_pending_parse",
+      "breakpoints": true
     }
   ]
 }

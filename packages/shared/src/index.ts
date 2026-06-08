@@ -70,6 +70,7 @@ export const ApplicationSchema = z.object({
   last_activity_at: z.number().nullable(),
   notes: z.string().nullable(),
   page_markdown: z.string().nullable(),
+  pending_parse: z.number(),
   archived: z.number(),
   created_at: z.number(),
   updated_at: z.number(),

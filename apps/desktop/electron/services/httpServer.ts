@@ -104,15 +104,8 @@ export async function startHttpServer(): Promise<number> {
       const newApp = await ApplicationService.createApplication(parsed.data)
       reply.code(201).send(newApp)
 
-      // Fire-and-forget background parse when the clipping setting is on
       if (newApp.page_markdown && (await getSetting('auto_parse_clippings')) === '1') {
-        ApplicationService.parseApplicationMarkdown(newApp.id)
-          .then((fields) => ApplicationService.updateApplication({
-            id: newApp.id,
-            role_title: fields.role_title || undefined,
-            job_description: fields.job_description || undefined,
-          }))
-          .catch(() => {})
+        ApplicationService.scheduleAutoParse(newApp.id)
       }
     }
   )

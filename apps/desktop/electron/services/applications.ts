@@ -266,6 +266,43 @@ export async function parseApplicationMarkdown(
   }
 }
 
+export async function setPendingParse(id: string, pending: boolean): Promise<void> {
+  const db = getDb()
+  await db
+    .update(applications)
+    .set({ pending_parse: pending ? 1 : 0, updated_at: Date.now() })
+    .where(eq(applications.id, id))
+}
+
+async function runParse(id: string): Promise<void> {
+  parseApplicationMarkdown(id)
+    .then(async (fields) => {
+      await updateApplication({
+        id,
+        role_title: fields.role_title || undefined,
+        job_description: fields.job_description || undefined,
+      })
+      await setPendingParse(id, false)
+    })
+    .catch(() => {})
+}
+
+export async function scheduleAutoParse(id: string): Promise<void> {
+  await setPendingParse(id, true)
+  runParse(id)
+}
+
+export async function retryPendingParses(): Promise<void> {
+  const db = getDb()
+  const pending = await db
+    .select({ id: applications.id })
+    .from(applications)
+    .where(eq(applications.pending_parse, 1))
+  for (const { id } of pending) {
+    runParse(id)
+  }
+}
+
 export async function deleteApplication(id: string): Promise<void> {
   const db = getDb()
   await db.delete(applications).where(eq(applications.id, id))

@@ -13,6 +13,7 @@ import { appRouter } from './ipc/router'
 import { startHttpServer } from './services/httpServer'
 import { getOrCreatePairingToken } from './services/pairing'
 import { startScheduler } from './services/scheduler'
+import { retryPendingParses } from './services/applications'
 import { updateBadgeCount } from './services/notifications'
 
 // ─── Logger ───────────────────────────────────────────────────────────────────
@@ -170,6 +171,9 @@ app.whenReady().then(async () => {
   } catch (err) {
     logger.error({ err }, 'Failed to start HTTP server')
   }
+
+  // Retry any parses that were interrupted by a previous shutdown
+  retryPendingParses().catch(() => {})
 
   // Start email scan scheduler
   await startScheduler()
