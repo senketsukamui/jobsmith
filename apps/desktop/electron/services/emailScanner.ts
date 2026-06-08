@@ -443,3 +443,30 @@ export async function linkEmailToApplication(id: string, applicationId: string):
     .set({ linked_application_id: applicationId })
     .where(eq(emails.id, id))
 }
+
+export async function draftInterviewReply(emailId: string): Promise<string> {
+  const db = getDb()
+  const [email] = await db.select().from(emails).where(eq(emails.id, emailId)).limit(1)
+  if (!email) throw new Error('Email not found')
+
+  let company = '', role = ''
+  if (email.linked_application_id) {
+    const [row] = await db
+      .select({ companyName: companies.name, roleTitle: applications.role_title })
+      .from(applications)
+      .innerJoin(companies, eq(applications.company_id, companies.id))
+      .where(eq(applications.id, email.linked_application_id))
+      .limit(1)
+    if (row) { company = row.companyName; role = row.roleTitle }
+  }
+
+  const model = (await getSetting('ollama_model')) ?? 'qwen2.5:3b-instruct'
+  const prompt = `Write a short professional email accepting an interview invitation (2-3 sentences, no subject line).
+From: ${email.from_name ?? ''}  Subject: ${email.subject ?? ''}
+Company: ${company}  Role: ${role}
+Snippet: ${email.body_snippet ?? ''}`
+
+  let draft = ''
+  for await (const token of streamGenerate(model, prompt)) draft += token
+  return draft.trim()
+}

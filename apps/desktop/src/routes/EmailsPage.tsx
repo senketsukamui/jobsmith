@@ -32,6 +32,11 @@ function EmailCard({ email, statuses, onDone }: {
   const queryClient = useQueryClient()
   const [linkAppId, setLinkAppId] = useState('')
   const [showLink, setShowLink] = useState(false)
+  const [draft, setDraft] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const draftMutation = trpc.emails.draftReply.useMutation({
+    onSuccess: (text) => setDraft(text),
+  })
 
   const applicationsQuery = trpc.applications.list.useQuery({})
   const apps = applicationsQuery.data ?? []
@@ -146,7 +151,7 @@ function EmailCard({ email, statuses, onDone }: {
       )}
 
       {/* Actions */}
-      <div className="flex gap-2 pt-1">
+      <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="button"
           onClick={() => accept.mutate(email.id)}
@@ -164,7 +169,49 @@ function EmailCard({ email, statuses, onDone }: {
         >
           Dismiss
         </button>
+        {email.classification === 'interview_invite' && (
+          <button
+            type="button"
+            onClick={() => draftMutation.mutate(email.id)}
+            disabled={draftMutation.isLoading}
+            className="h-8 px-3 rounded-md border border-violet-300 text-violet-700 dark:text-violet-400 text-xs font-medium hover:bg-violet-50 dark:hover:bg-violet-950/30 disabled:opacity-50 transition-colors"
+          >
+            {draftMutation.isLoading ? 'Drafting…' : 'Draft reply'}
+          </button>
+        )}
       </div>
+
+      {/* Draft reply area */}
+      {draft !== null && (
+        <div className="space-y-2 pt-1">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={6}
+            className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs font-mono shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-y"
+          />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(draft)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+              className="h-7 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors"
+            >
+              {copied ? 'Copied!' : 'Copy to clipboard'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setDraft(null)}
+              className="text-xs text-muted-foreground hover:underline"
+            >
+              Hide
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,8 +1,17 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ApplicationSource } from '@jobsmith/shared'
 import { trpc } from '@/lib/trpc'
 import { useUiStore } from '@/stores/ui'
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(value), delay)
+    return () => clearTimeout(t)
+  }, [value, delay])
+  return debounced
+}
 
 const SOURCES: { value: ApplicationSource; label: string }[] = [
   { value: 'manual', label: 'Manual' },
@@ -32,6 +41,16 @@ export function AddApplicationDialog() {
 
   const cvsQuery = trpc.cvs.list.useQuery()
   const cvs = cvsQuery.data ?? []
+
+  // Duplicate warning
+  const debouncedCompany = useDebounce(companyName, 200)
+  const duplicateCheck = trpc.applications.list.useQuery(
+    { query: debouncedCompany.trim() },
+    { enabled: debouncedCompany.trim().length >= 2, staleTime: 5_000 }
+  )
+  const duplicates = (duplicateCheck.data ?? []).filter(
+    (a) => a.company.name.toLowerCase() === debouncedCompany.trim().toLowerCase() && a.archived === 0
+  )
 
   // Company autocomplete
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -141,6 +160,22 @@ export function AddApplicationDialog() {
                 </div>
               )}
             </div>
+
+            {/* Duplicate warning */}
+            {duplicates.length > 0 && (
+              <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/20 px-3 py-2 space-y-1">
+                <p className="text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                  Existing application{duplicates.length > 1 ? 's' : ''} at this company:
+                </p>
+                {duplicates.map((d) => (
+                  <div key={d.id} className="flex items-center gap-2 text-xs">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.status.color }} />
+                    <span className="font-medium">{d.role_title}</span>
+                    <span className="text-muted-foreground">— {d.status.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Company website */}
             <div className="space-y-1.5">

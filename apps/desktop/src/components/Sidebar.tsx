@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { trpc } from '@/lib/trpc'
 
-type Page = 'applications' | 'emails' | 'settings'
+type Page = 'applications' | 'stats' | 'emails' | 'settings'
 
 interface SidebarProps {
   active: Page
@@ -33,6 +33,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
 
   const NAV: { id: Page; label: string; icon: string; badge?: number }[] = [
     { id: 'applications', label: 'Applications', icon: '📋' },
+    { id: 'stats', label: 'Stats', icon: '📊' },
     { id: 'emails', label: 'Emails', icon: '✉️', badge: pendingCount > 0 ? pendingCount : undefined },
     { id: 'settings', label: 'Settings', icon: '⚙️' },
   ]

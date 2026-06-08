@@ -22,6 +22,7 @@ import * as GmailService from '../services/gmail'
 import * as EmailScannerService from '../services/emailScanner'
 import * as ExportService from '../services/export'
 import * as SyncConfigService from '../services/syncConfig'
+import * as StatsService from '../services/stats'
 import { syncNow } from '../db/client'
 import { updateBadgeCount } from '../services/notifications'
 
@@ -237,6 +238,10 @@ const emailsRouter = router({
   syncBadge: procedure.mutation(() => updateBadgeCount()),
 
   history: procedure.query(() => EmailScannerService.getRecentEmails()),
+
+  draftReply: procedure.input(z.string()).mutation(({ input }) =>
+    EmailScannerService.draftInterviewReply(input)
+  ),
 })
 
 // ─── Export ───────────────────────────────────────────────────────────────────
@@ -267,6 +272,18 @@ const syncRouter = router({
   syncNow: procedure.mutation(() => syncNow()),
 })
 
+// ─── Stats ────────────────────────────────────────────────────────────────────
+
+const StatsInput = z.object({
+  weekCount: z.number().int().min(1).max(52).optional(),
+  includeArchived: z.boolean().optional(),
+  source: z.string().optional(),
+}).optional()
+
+const statsRouter = router({
+  get: procedure.input(StatsInput).query(({ input }) => StatsService.getStats(input ?? {})),
+})
+
 // ─── App router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -281,6 +298,7 @@ export const appRouter = router({
   emails: emailsRouter,
   export: exportRouter,
   sync: syncRouter,
+  stats: statsRouter,
 })
 
 export type AppRouter = typeof appRouter

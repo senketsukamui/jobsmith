@@ -6,10 +6,11 @@ import { Sidebar } from '@/components/Sidebar'
 import { ApplicationsPage } from '@/routes/ApplicationsPage'
 import { EmailsPage } from '@/routes/EmailsPage'
 import { SettingsPage } from '@/routes/SettingsPage'
+import { StatsPage } from '@/routes/StatsPage'
 import { OnboardingWizard } from '@/components/OnboardingWizard'
 import { ToastProvider } from '@/components/Toast'
 
-type Page = 'applications' | 'emails' | 'settings'
+type Page = 'applications' | 'stats' | 'emails' | 'settings'
 
 function AppInner() {
   const [page, setPage] = useState<Page>('applications')
@@ -24,6 +25,7 @@ function AppInner() {
       <Sidebar active={page} onNavigate={setPage} />
       <main className="flex-1 min-w-0 overflow-hidden">
         {page === 'applications' && <ApplicationsPage />}
+        {page === 'stats' && <StatsPage />}
         {page === 'emails' && <EmailsPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
