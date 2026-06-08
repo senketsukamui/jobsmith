@@ -21,6 +21,8 @@ import * as PairingService from '../services/pairing'
 import * as GmailService from '../services/gmail'
 import * as EmailScannerService from '../services/emailScanner'
 import * as ExportService from '../services/export'
+import * as SyncConfigService from '../services/syncConfig'
+import { syncNow } from '../db/client'
 import { updateBadgeCount } from '../services/notifications'
 
 const t = initTRPC.create({ isServer: true })
@@ -245,6 +247,26 @@ const exportRouter = router({
   validateNotion: procedure.query(() => ExportService.validateNotionConnection()),
 })
 
+// ─── Sync ─────────────────────────────────────────────────────────────────────
+
+const syncRouter = router({
+  get: procedure.query(() => SyncConfigService.getSyncConfigPublic()),
+  set: procedure
+    .input(z.object({ syncUrl: z.string().url(), authToken: z.string().min(1) }))
+    .mutation(({ input }) => {
+      SyncConfigService.writeSyncConfig(input.syncUrl, input.authToken)
+      return { ok: true }
+    }),
+  clear: procedure.mutation(() => {
+    SyncConfigService.clearSyncConfig()
+    return { ok: true }
+  }),
+  test: procedure
+    .input(z.object({ syncUrl: z.string(), authToken: z.string() }))
+    .mutation(({ input }) => SyncConfigService.testSyncConnection(input.syncUrl, input.authToken)),
+  syncNow: procedure.mutation(() => syncNow()),
+})
+
 // ─── App router ───────────────────────────────────────────────────────────────
 
 export const appRouter = router({
@@ -258,6 +280,7 @@ export const appRouter = router({
   gmail: gmailRouter,
   emails: emailsRouter,
   export: exportRouter,
+  sync: syncRouter,
 })
 
 export type AppRouter = typeof appRouter

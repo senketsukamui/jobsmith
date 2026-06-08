@@ -4,9 +4,11 @@ import { scanEmails } from './emailScanner'
 import { getSetting } from './settings'
 import { getStaleApplications, autoGhostStaleApplications } from './applications'
 import { notify, updateBadgeCount } from './notifications'
+import { syncNow, isSyncEnabled } from '../db/client'
 
 let emailTask: cron.ScheduledTask | null = null
 let followUpTask: cron.ScheduledTask | null = null
+let syncTask: cron.ScheduledTask | null = null
 
 export async function startScheduler(): Promise<void> {
   // Run auto-ghost check immediately on startup to catch pre-existing stale apps
@@ -31,6 +33,13 @@ export async function startScheduler(): Promise<void> {
       await updateBadgeCount()
     } catch { /* errors logged elsewhere */ }
   })
+
+  // Sync every 5 minutes when embedded replica is active
+  if (isSyncEnabled()) {
+    syncTask = cron.schedule('*/5 * * * *', () => {
+      syncNow().catch(() => {})
+    })
+  }
 
   // Daily 9am: auto-ghost stale applied apps + follow-up reminders
   followUpTask = cron.schedule('0 9 * * *', async () => {
@@ -64,6 +73,8 @@ export function stopScheduler(): void {
   emailTask = null
   followUpTask?.stop()
   followUpTask = null
+  syncTask?.stop()
+  syncTask = null
 }
 
 export async function restartScheduler(): Promise<void> {

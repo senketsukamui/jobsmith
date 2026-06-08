@@ -6,8 +6,9 @@ import { createIPCHandler } from 'electron-trpc/main'
 import path from 'path'
 import pino from 'pino'
 import fs from 'fs'
-import { initClient } from './db/client'
+import { initClient, syncNow } from './db/client'
 import { runMigrations } from './db/migrate'
+import { readSyncConfig } from './services/syncConfig'
 import { appRouter } from './ipc/router'
 import { startHttpServer } from './services/httpServer'
 import { getOrCreatePairingToken } from './services/pairing'
@@ -26,15 +27,31 @@ function createLogger() {
 
 // ─── DB ───────────────────────────────────────────────────────────────────────
 
-async function initDb() {
+async function initDb(logger: ReturnType<typeof createLogger>) {
   const dbPath = path.join(app.getPath('userData'), 'data.db')
-  initClient(`file:${dbPath}`)
+  const syncConf = readSyncConfig()
+
+  if (syncConf) {
+    try {
+      initClient(`file:${dbPath}`, syncConf)
+      logger.info({ syncUrl: syncConf.syncUrl }, 'DB initialised with embedded replica sync')
+    } catch (err) {
+      logger.warn({ err }, 'Sync init failed — falling back to local-only')
+      initClient(`file:${dbPath}`)
+    }
+  } else {
+    initClient(`file:${dbPath}`)
+  }
 
   const migrationsFolder = app.isPackaged
     ? path.join(process.resourcesPath, 'migrations')
     : path.join(__dirname, '../electron/db/migrations')
 
   await runMigrations(migrationsFolder)
+
+  if (syncConf) {
+    syncNow().catch((err) => logger.warn({ err }, 'Initial sync failed'))
+  }
 }
 
 // ─── Window ───────────────────────────────────────────────────────────────────
@@ -135,7 +152,7 @@ app.whenReady().then(async () => {
   const logger = createLogger()
 
   try {
-    await initDb()
+    await initDb(logger)
     logger.info('Database initialized')
   } catch (err) {
     logger.error({ err }, 'Failed to initialize database')
