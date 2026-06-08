@@ -10,7 +10,8 @@ function OllamaSection() {
   const settingsQuery = trpc.settings.getAll.useQuery()
 
   const savedHost = settingsQuery.data?.ollama_host ?? 'http://localhost:11434'
-  const savedModel = settingsQuery.data?.ollama_model ?? 'qwen2.5:7b-instruct'
+  const savedModel = settingsQuery.data?.ollama_model ?? 'qwen2.5:3b-instruct'
+  const autoParseEnabled = settingsQuery.data?.auto_parse_clippings === '1'
 
   const [host, setHost] = useState('')
   const [pullModel, setPullModel] = useState('')
@@ -145,6 +146,23 @@ function OllamaSection() {
           )}
         </div>
       )}
+
+      {/* Auto-parse clippings */}
+      <div className="space-y-1">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={autoParseEnabled}
+            onChange={(e) =>
+              setSetting.mutate({ key: 'auto_parse_clippings', value: e.target.checked ? '1' : '0' })
+            }
+          />
+          <span className="text-sm">Auto-parse page clippings with AI</span>
+        </label>
+        <p className="text-xs text-muted-foreground pl-5">
+          When the Chrome extension captures a job page, automatically extract the role title and job description in the background.
+        </p>
+      </div>
     </section>
   )
 }

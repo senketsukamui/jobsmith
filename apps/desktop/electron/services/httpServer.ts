@@ -8,6 +8,7 @@ import { handleOAuthCallback } from './gmail'
 import * as ApplicationService from './applications'
 import * as CompanyService from './companies'
 import * as StatusService from './statuses'
+import { getSetting } from './settings'
 import { CreateApplicationInput } from '@jobsmith/shared'
 
 const PORT_MIN = 53700
@@ -100,8 +101,19 @@ export async function startHttpServer(): Promise<number> {
         reply.code(400).send({ error: 'Invalid payload', details: parsed.error.flatten() })
         return
       }
-      const app = await ApplicationService.createApplication(parsed.data)
-      reply.code(201).send(app)
+      const newApp = await ApplicationService.createApplication(parsed.data)
+      reply.code(201).send(newApp)
+
+      // Fire-and-forget background parse when the clipping setting is on
+      if (newApp.page_markdown && (await getSetting('auto_parse_clippings')) === '1') {
+        ApplicationService.parseApplicationMarkdown(newApp.id)
+          .then((fields) => ApplicationService.updateApplication({
+            id: newApp.id,
+            role_title: fields.role_title || undefined,
+            job_description: fields.job_description || undefined,
+          }))
+          .catch(() => {})
+      }
     }
   )
 
