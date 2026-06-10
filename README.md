@@ -1,4 +1,20 @@
-# Jobsmith
+<p align="center">
+  <img src="apps/desktop/assets/icon.svg" width="96" alt="Jobsmith" />
+</p>
+<h1 align="center">Jobsmith</h1>
+<p align="center"><em>Local-first job application tracker with Gmail scanning and AI-powered insights</em></p>
+<p align="center">
+  <img src="https://img.shields.io/badge/Electron-33-47848f?logo=electron&logoColor=white&style=flat-square" alt="Electron" />
+  <img src="https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=black&style=flat-square" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript&logoColor=white&style=flat-square" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Vite-6-646cff?logo=vite&logoColor=white&style=flat-square" alt="Vite" />
+  <img src="https://img.shields.io/badge/Tailwind-3-06b6d4?logo=tailwindcss&logoColor=white&style=flat-square" alt="Tailwind CSS" />
+  <img src="https://img.shields.io/badge/Ollama-local%20LLM-000000?style=flat-square" alt="Ollama" />
+  <img src="https://img.shields.io/badge/platform-macOS-000000?logo=apple&logoColor=white&style=flat-square" alt="macOS" />
+  <img src="https://img.shields.io/badge/local--first-%E2%9C%93-4ade80?style=flat-square" alt="local-first" />
+</p>
+
+---
 
 A local-first Electron desktop app for tracking job applications. Scans your Gmail for application-related emails, classifies them with a local LLM (Ollama), and automatically updates application statuses. Comes with a Chrome extension for one-click capture from LinkedIn, Lever, Greenhouse, and any other job board.
 
