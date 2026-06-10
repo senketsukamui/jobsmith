@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { ApplicationWithRelations, Status } from '@jobsmith/shared'
 import { trpc } from '@/lib/trpc'
@@ -48,6 +48,8 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
   const [bulkLoading, setBulkLoading] = useState(false)
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
+  const tbodyRef = useRef<HTMLTableSectionElement>(null)
 
   const archiveMutation = trpc.applications.archive.useMutation({
     onSuccess: () => queryClient.invalidateQueries(),
@@ -108,6 +110,22 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
       return next
     })
   }
+
+  const handleTableKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (sorted.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setFocusedIndex((i) => Math.min((i ?? -1) + 1, sorted.length - 1))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setFocusedIndex((i) => Math.max((i ?? sorted.length) - 1, 0))
+    } else if (e.key === 'Enter' && focusedIndex !== null) {
+      e.preventDefault()
+      onRowClick?.(sorted[focusedIndex].id)
+    } else if (e.key === 'Escape') {
+      setFocusedIndex(null)
+    }
+  }, [sorted, focusedIndex, onRowClick])
 
   async function handleBulkArchive() {
     if (!checkedIds.size) return
@@ -195,8 +213,14 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
               </th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border">
-            {sorted.map((app) => {
+          <tbody
+          ref={tbodyRef}
+          tabIndex={0}
+          onKeyDown={handleTableKeyDown}
+          onFocus={() => { if (focusedIndex === null && sorted.length > 0) setFocusedIndex(0) }}
+          className="divide-y divide-border outline-none"
+        >
+            {sorted.map((app, idx) => {
               const days = daysAgo(app.last_activity_at)
               const isTerminal = app.status.is_terminal === 1
               const staleClass = !isTerminal && days !== null
@@ -207,11 +231,13 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
                     : ''
                 : ''
               const checked = checkedIds.has(app.id)
+              const isFocused = focusedIndex === idx
               return (
                 <tr
                   key={app.id}
+                  onClick={() => { setFocusedIndex(idx); onRowClick?.(app.id) }}
                   className={`transition-colors ${staleClass} ${onRowClick ? 'cursor-pointer' : ''} ${
-                    checked ? 'bg-accent/60' : selectedId === app.id ? 'bg-accent' : 'hover:bg-muted/30'
+                    checked ? 'bg-accent/60' : isFocused ? 'ring-1 ring-inset ring-ring' : selectedId === app.id ? 'bg-accent' : 'hover:bg-muted/30'
                   }`}
                 >
                   <td className="px-3 py-2.5 w-8" onClick={(e) => e.stopPropagation()}>
@@ -222,12 +248,12 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
                       className="rounded"
                     />
                   </td>
-                  <td className="px-3 py-2.5 font-medium max-w-[180px]" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 font-medium max-w-[180px]">
                     <span className="block truncate" title={app.company.name}>
                       {app.company.name}
                     </span>
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground max-w-[220px]" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 text-muted-foreground max-w-[220px]">
                     <span className="block truncate" title={app.role_title}>
                       {app.role_title}
                     </span>
@@ -239,16 +265,16 @@ export function ApplicationTable({ applications, statuses, selectedId, onRowClic
                       statuses={statuses}
                     />
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                     {SOURCE_LABELS[app.source] ?? app.source}
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                     {formatDate(app.applied_at)}
                   </td>
-                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
                     {formatDate(app.last_activity_at)}
                   </td>
-                  <td className="px-3 py-2.5 whitespace-nowrap" onClick={() => onRowClick?.(app.id)}>
+                  <td className="px-3 py-2.5 whitespace-nowrap">
                     <AgeBadge days={days} isTerminal={isTerminal} />
                   </td>
                 </tr>

@@ -133,6 +133,9 @@ export async function updateApplication(
   if (input.archived !== undefined) patch.archived = input.archived
   if (input.applied_at !== undefined) patch.applied_at = input.applied_at
   if (input.notes !== undefined) patch.notes = input.notes
+  if (input.salary_min !== undefined) patch.salary_min = input.salary_min
+  if (input.salary_max !== undefined) patch.salary_max = input.salary_max
+  if (input.salary_currency !== undefined) patch.salary_currency = input.salary_currency
 
   await db.update(applications).set(patch).where(eq(applications.id, input.id))
   const result = await getApplication(input.id)

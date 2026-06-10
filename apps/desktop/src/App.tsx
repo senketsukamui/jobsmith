@@ -4,6 +4,7 @@ import { ipcLink } from 'electron-trpc/renderer'
 import { trpc } from '@/lib/trpc'
 import { useUiStore } from '@/stores/ui'
 import { Sidebar } from '@/components/Sidebar'
+import { CommandPalette } from '@/components/CommandPalette'
 import { ApplicationsPage } from '@/routes/ApplicationsPage'
 import { EmailsPage } from '@/routes/EmailsPage'
 import { SettingsPage } from '@/routes/SettingsPage'
@@ -46,6 +47,10 @@ function AppInner() {
       {showWizard && (
         <OnboardingWizard onDone={() => setWizardDismissed(true)} />
       )}
+      <CommandPalette
+        onNavigate={(p) => setPage(p)}
+        onNewApplication={() => { setPage('applications'); openAddDialog() }}
+      />
     </div>
   )
 }

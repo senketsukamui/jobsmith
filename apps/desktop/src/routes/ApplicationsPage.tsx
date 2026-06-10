@@ -76,6 +76,13 @@ export function ApplicationsPage() {
     ? (staleQuery.data ?? [])
     : (applicationsQuery.data ?? [])
 
+  // Count per status from currently loaded (unfiltered) apps for badge display
+  const allAppsForCounts = applicationsQuery.data ?? []
+  const statusCounts = allAppsForCounts.reduce<Record<string, number>>((acc, a) => {
+    acc[a.current_status_id] = (acc[a.current_status_id] ?? 0) + 1
+    return acc
+  }, {})
+
   const isLoading = showFollowUp ? staleQuery.isLoading : applicationsQuery.isLoading
   const isError = showFollowUp ? staleQuery.isError : applicationsQuery.isError
   const errorMessage = showFollowUp
@@ -136,6 +143,7 @@ export function ApplicationsPage() {
         <div className="flex flex-wrap items-center gap-2 px-4 py-2 border-b border-border shrink-0">
           {statuses.map((s) => {
             const active = statusFilter.includes(s.id)
+            const count = statusCounts[s.id] ?? 0
             return (
               <button
                 key={s.id}
@@ -147,7 +155,7 @@ export function ApplicationsPage() {
                       : [...statusFilter, s.id]
                   )
                 }
-                className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium border transition-all whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium border transition-all whitespace-nowrap"
                 style={
                   active
                     ? { backgroundColor: s.color, color: '#fff', borderColor: s.color }
@@ -155,6 +163,14 @@ export function ApplicationsPage() {
                 }
               >
                 {s.name}
+                {count > 0 && (
+                  <span
+                    className="rounded-full px-1 min-w-[16px] text-center text-[10px] font-bold leading-[16px]"
+                    style={active ? { backgroundColor: 'rgba(255,255,255,0.3)' } : { backgroundColor: s.color, color: '#fff' }}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
             )
           })}

@@ -60,11 +60,8 @@ export function AddApplicationDialog() {
   })
 
   const createApp = trpc.applications.create.useMutation({
-    onSuccess: () => {
-      queryClient.invalidateQueries()
-      handleClose()
-    },
-    onError: (err: { message: string }) => setError(err.message),
+    onSuccess: () => { queryClient.invalidateQueries(); handleClose() },
+    onError: (err: { message: string }) => setError(err.message ?? 'Failed to save application'),
   })
 
   function handleClose() {

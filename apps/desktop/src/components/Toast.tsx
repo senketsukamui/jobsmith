@@ -4,10 +4,11 @@ interface ToastItem {
   id: number
   message: string
   variant: 'default' | 'success' | 'error'
+  action?: { label: string; onClick: () => void }
 }
 
 interface ToastContextValue {
-  toast: (message: string, variant?: ToastItem['variant']) => void
+  toast: (message: string, variant?: ToastItem['variant'], action?: ToastItem['action']) => void
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null)
@@ -30,10 +31,16 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     if (t) { clearTimeout(t); timers.current.delete(id) }
   }, [])
 
-  const toast = useCallback((message: string, variant: ToastItem['variant'] = 'default') => {
+  const toast = useCallback((
+    message: string,
+    variant: ToastItem['variant'] = 'default',
+    action?: ToastItem['action'],
+  ) => {
     const id = nextId++
-    setItems((prev) => [...prev, { id, message, variant }])
-    const t = setTimeout(() => dismiss(id), 4000)
+    setItems((prev) => [...prev, { id, message, variant, action }])
+    // Give more time when there's an action so user can react
+    const delay = action ? 6000 : 4000
+    const t = setTimeout(() => dismiss(id), delay)
     timers.current.set(id, t)
   }, [dismiss])
 
@@ -49,10 +56,9 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {items.map((item) => (
           <div
             key={item.id}
-            onClick={() => dismiss(item.id)}
             className={`
-              pointer-events-auto flex items-start gap-3 min-w-[260px] max-w-[360px]
-              rounded-lg border shadow-lg px-4 py-3 text-sm cursor-pointer
+              pointer-events-auto flex items-center gap-3 min-w-[260px] max-w-[380px]
+              rounded-lg border shadow-lg px-4 py-3 text-sm
               animate-in slide-in-from-bottom-2 fade-in duration-200
               ${item.variant === 'success'
                 ? 'bg-card border-green-200 text-foreground'
@@ -61,14 +67,30 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                 : 'bg-card border-border text-foreground'}
             `}
           >
-            <span className={`mt-0.5 shrink-0 text-base leading-none ${
+            <span className={`shrink-0 text-base leading-none ${
               item.variant === 'success' ? 'text-green-500' :
               item.variant === 'error'   ? 'text-destructive' :
               'text-muted-foreground'
             }`}>
               {item.variant === 'success' ? '✓' : item.variant === 'error' ? '✕' : 'ℹ'}
             </span>
-            <span className="leading-snug">{item.message}</span>
+            <span className="leading-snug flex-1">{item.message}</span>
+            {item.action && (
+              <button
+                type="button"
+                onClick={() => { item.action!.onClick(); dismiss(item.id) }}
+                className="shrink-0 text-xs font-semibold text-primary hover:underline"
+              >
+                {item.action.label}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => dismiss(item.id)}
+              className="shrink-0 text-muted-foreground hover:text-foreground text-xs leading-none"
+            >
+              ✕
+            </button>
           </div>
         ))}
       </div>

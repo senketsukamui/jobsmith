@@ -114,21 +114,23 @@ async function classifyEmail(params: {
 async function findMatchingApplication(
   companyGuess: string,
   roleGuess: string
-): Promise<string | null> {
+): Promise<{ appId: string; companyId: string } | null> {
   if (!companyGuess && !roleGuess) return null
 
   const db = getDb()
   const apps = await db
     .select({
       id: applications.id,
+      company_id: applications.company_id,
       role_title: applications.role_title,
       company_name: companies.name,
     })
     .from(applications)
     .innerJoin(companies, eq(applications.company_id, companies.id))
+    .where(eq(applications.archived, 0))
 
   const THRESHOLD = 4
-  let bestId: string | null = null
+  let best: { appId: string; companyId: string } | null = null
   let bestScore = Infinity
 
   for (const app of apps) {
@@ -142,12 +144,12 @@ async function findMatchingApplication(
 
     if (score < bestScore && compScore <= THRESHOLD && (roleGuess === '' || roleScore <= THRESHOLD)) {
       bestScore = score
-      bestId = app.id
+      best = { appId: app.id, companyId: app.company_id }
     }
   }
 
-  console.log(`[emailScanner] findMatchingApplication: company="${companyGuess}" role="${roleGuess}" → ${bestId ?? 'no match'} (score=${bestScore})`)
-  return bestId
+  console.log(`[emailScanner] findMatchingApplication: company="${companyGuess}" role="${roleGuess}" → ${best?.appId ?? 'no match'} (score=${bestScore})`)
+  return best
 }
 
 // ─── Gmail message fetching ───────────────────────────────────────────────────
@@ -328,10 +330,12 @@ export async function scanEmails(): Promise<ScanResult> {
     }
 
     // Fuzzy-match to an application
-    const linkedAppId = await findMatchingApplication(
+    const linked = await findMatchingApplication(
       classification.company_guess,
       classification.role_guess
     )
+    const linkedAppId = linked?.appId ?? null
+    const linkedCompanyId = linked?.companyId ?? null
 
     // Find matching status for suggestion
     let suggestedStatusId: string | null = null
@@ -388,7 +392,7 @@ export async function scanEmails(): Promise<ScanResult> {
       confidence: classification.confidence,
       suggested_status_id: suggestedStatusId,
       linked_application_id: linkedAppId,
-      linked_company_id: null,
+      linked_company_id: linkedCompanyId,
       user_action: canAutoApply ? 'accepted' : 'pending',
       raw_llm_output: JSON.stringify(classification),
       processed_at: now,

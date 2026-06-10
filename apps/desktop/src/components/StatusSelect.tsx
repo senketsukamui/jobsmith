@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import type { Status } from '@jobsmith/shared'
 import { trpc } from '@/lib/trpc'
 import { StatusBadge } from './StatusBadge'
+import { useToast } from './Toast'
 
 interface StatusSelectProps {
   applicationId: string
@@ -13,12 +14,11 @@ interface StatusSelectProps {
 export function StatusSelect({ applicationId, currentStatus, statuses }: StatusSelectProps) {
   const [open, setOpen] = useState(false)
   const queryClient = useQueryClient()
+  const { toast } = useToast()
 
   const changeStatus = trpc.applications.changeStatus.useMutation({
-    onSuccess: () => {
-      queryClient.invalidateQueries()
-      setOpen(false)
-    },
+    onSuccess: () => { queryClient.invalidateQueries(); setOpen(false) },
+    onError: (err) => toast(err.message ?? 'Failed to change status', 'error'),
   })
 
   if (!open) {

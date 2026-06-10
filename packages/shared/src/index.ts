@@ -69,6 +69,9 @@ export const ApplicationSchema = z.object({
   applied_at: z.number().nullable(),
   last_activity_at: z.number().nullable(),
   notes: z.string().nullable(),
+  salary_min: z.number().nullable(),
+  salary_max: z.number().nullable(),
+  salary_currency: z.string().nullable(),
   page_markdown: z.string().nullable(),
   pending_parse: z.number(),
   archived: z.number(),
@@ -179,6 +182,9 @@ export const UpdateApplicationInput = z.object({
   archived: z.number().optional(),
   applied_at: z.number().nullable().optional(),
   notes: z.string().nullable().optional(),
+  salary_min: z.number().nullable().optional(),
+  salary_max: z.number().nullable().optional(),
+  salary_currency: z.string().nullable().optional(),
 })
 export type UpdateApplicationInput = z.infer<typeof UpdateApplicationInput>
 

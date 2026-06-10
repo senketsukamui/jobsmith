@@ -126,6 +126,9 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
   const [editJobUrl, setEditJobUrl] = useState('')
   const [editJobDesc, setEditJobDesc] = useState('')
   const [editNotes, setEditNotes] = useState('')
+  const [editSalaryMin, setEditSalaryMin] = useState('')
+  const [editSalaryMax, setEditSalaryMax] = useState('')
+  const [editSalaryCurrency, setEditSalaryCurrency] = useState('USD')
 
   const [inlineNotes, setInlineNotes] = useState('')
   const [notesSaving, setNotesSaving] = useState(false)
@@ -138,7 +141,17 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
   }, [applicationId, appQuery.data?.notes])
 
   const deleteCoverLetter = trpc.coverLetters.delete.useMutation({ onSuccess: () => queryClient.invalidateQueries() })
-  const archiveMutation = trpc.applications.archive.useMutation({ onSuccess: () => queryClient.invalidateQueries() })
+  const archiveMutation = trpc.applications.archive.useMutation({
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries()
+      if (vars.archived === 1) {
+        toast('Application archived', 'default', {
+          label: 'Undo',
+          onClick: () => archiveMutation.mutate({ id: vars.id, archived: 0 }),
+        })
+      }
+    },
+  })
 
   const notesMutation = trpc.applications.update.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); setNotesSaving(false) },
@@ -147,6 +160,7 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
 
   const updateMutation = trpc.applications.update.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); setEditing(false); toast('Application updated', 'success') },
+    onError: (err) => toast(err.message ?? 'Failed to save', 'error'),
   })
 
   function handleNotesSave() {
@@ -159,6 +173,7 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
 
   const deleteMutation = trpc.applications.delete.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); toast('Application deleted', 'default'); onClose() },
+    onError: (err) => toast(err.message ?? 'Failed to delete', 'error'),
   })
 
   const parseMutation = trpc.applications.parseMarkdown.useMutation({
@@ -183,6 +198,9 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
     setEditJobUrl(app!.job_url ?? '')
     setEditJobDesc(app!.job_description ?? '')
     setEditNotes(app!.notes ?? '')
+    setEditSalaryMin(app!.salary_min != null ? String(app!.salary_min) : '')
+    setEditSalaryMax(app!.salary_max != null ? String(app!.salary_max) : '')
+    setEditSalaryCurrency(app!.salary_currency ?? 'USD')
     setEditing(true)
   }
 
@@ -195,6 +213,9 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
       job_url: editJobUrl || undefined,
       job_description: editJobDesc || undefined,
       notes: editNotes || undefined,
+      salary_min: editSalaryMin ? parseInt(editSalaryMin, 10) : null,
+      salary_max: editSalaryMax ? parseInt(editSalaryMax, 10) : null,
+      salary_currency: editSalaryCurrency || 'USD',
     })
   }
 
@@ -217,7 +238,7 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
               <button type="button" onClick={startEditing} className="text-xs text-muted-foreground hover:text-foreground">Edit</button>
             )}
             <button type="button" onClick={() => archiveMutation.mutate({ id: app.id, archived: app.archived ? 0 : 1 })} disabled={archiveMutation.isLoading} className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-              {app.archived ? 'Unarchive' : 'Archive'}
+              {archiveMutation.isLoading ? '…' : app.archived ? 'Unarchive' : 'Archive'}
             </button>
             <button type="button" onClick={handleDelete} disabled={deleteMutation.isLoading} className="text-xs text-destructive hover:text-destructive/80 disabled:opacity-50">Delete</button>
             <button type="button" onClick={onClose} className="text-muted-foreground hover:text-foreground leading-none text-base">✕</button>
@@ -249,6 +270,17 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job URL</label>
                 <input type="url" value={editJobUrl} onChange={(e) => setEditJobUrl(e.target.value)} className="w-full h-8 rounded-md border border-input bg-transparent px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Salary range</label>
+                <div className="flex items-center gap-2">
+                  <select value={editSalaryCurrency} onChange={(e) => setEditSalaryCurrency(e.target.value)} className="h-8 rounded-md border border-input bg-transparent px-2 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring shrink-0">
+                    {['USD','EUR','GBP','CAD','AUD','CHF','JPY','INR'].map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input type="number" value={editSalaryMin} onChange={(e) => setEditSalaryMin(e.target.value)} placeholder="Min" className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                  <span className="text-xs text-muted-foreground">–</span>
+                  <input type="number" value={editSalaryMax} onChange={(e) => setEditSalaryMax(e.target.value)} placeholder="Max" className="flex-1 h-8 rounded-md border border-input bg-transparent px-3 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring" />
+                </div>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job description</label>
@@ -287,6 +319,16 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground w-20 shrink-0">Job URL</span>
                     <a href={app.job_url} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline truncate">{app.job_url}</a>
+                  </div>
+                )}
+                {(app.salary_min != null || app.salary_max != null) && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-20 shrink-0">Salary</span>
+                    <span className="text-xs">
+                      {app.salary_currency ?? 'USD'}{' '}
+                      {app.salary_min != null ? app.salary_min.toLocaleString() : '?'}
+                      {app.salary_max != null ? ` – ${app.salary_max.toLocaleString()}` : '+'}
+                    </span>
                   </div>
                 )}
               </div>
