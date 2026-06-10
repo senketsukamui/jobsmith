@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { trpc } from '@/lib/trpc'
 import type { Status } from '@jobsmith/shared'
@@ -127,12 +127,35 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
   const [editJobDesc, setEditJobDesc] = useState('')
   const [editNotes, setEditNotes] = useState('')
 
+  const [inlineNotes, setInlineNotes] = useState('')
+  const [notesSaving, setNotesSaving] = useState(false)
+  const savedNotes = useRef('')
+
+  useEffect(() => {
+    const val = appQuery.data?.notes ?? ''
+    setInlineNotes(val)
+    savedNotes.current = val
+  }, [applicationId, appQuery.data?.notes])
+
   const deleteCoverLetter = trpc.coverLetters.delete.useMutation({ onSuccess: () => queryClient.invalidateQueries() })
   const archiveMutation = trpc.applications.archive.useMutation({ onSuccess: () => queryClient.invalidateQueries() })
+
+  const notesMutation = trpc.applications.update.useMutation({
+    onSuccess: () => { queryClient.invalidateQueries(); setNotesSaving(false) },
+    onError: () => setNotesSaving(false),
+  })
 
   const updateMutation = trpc.applications.update.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); setEditing(false); toast('Application updated', 'success') },
   })
+
+  function handleNotesSave() {
+    const trimmed = inlineNotes.trim()
+    if (trimmed === savedNotes.current.trim()) return
+    savedNotes.current = trimmed
+    setNotesSaving(true)
+    notesMutation.mutate({ id: app!.id, notes: trimmed || null })
+  }
 
   const deleteMutation = trpc.applications.delete.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); toast('Application deleted', 'default'); onClose() },
@@ -231,10 +254,6 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
                 <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Job description</label>
                 <textarea value={editJobDesc} onChange={(e) => setEditJobDesc(e.target.value)} rows={5} className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs leading-relaxed focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" />
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</label>
-                <textarea value={editNotes} onChange={(e) => setEditNotes(e.target.value)} rows={3} placeholder="Personal notes, follow-up reminders, interview prep…" className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none" />
-              </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={handleSaveEdit} disabled={updateMutation.isLoading} className="h-8 inline-flex items-center justify-center rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                   {updateMutation.isLoading ? 'Saving…' : 'Save'}
@@ -272,13 +291,21 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
                 )}
               </div>
 
-              {/* Notes */}
-              {app.notes && (
-                <div className="space-y-1.5">
+              {/* Notes — inline editable, auto-saves on blur */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</p>
-                  <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">{app.notes}</p>
+                  {notesSaving && <span className="text-xs text-muted-foreground">Saving…</span>}
                 </div>
-              )}
+                <textarea
+                  value={inlineNotes}
+                  onChange={(e) => setInlineNotes(e.target.value)}
+                  onBlur={handleNotesSave}
+                  rows={3}
+                  placeholder="Add notes, follow-up reminders, interview prep…"
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-xs leading-relaxed placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none transition-colors"
+                />
+              </div>
 
               {/* Timeline */}
               {history.length > 0 && (
