@@ -10,6 +10,7 @@ import {
   Area,
   CartesianGrid,
   Cell,
+  LabelList,
 } from 'recharts'
 import { trpc } from '@/lib/trpc'
 import { cn } from '@/lib/utils'
@@ -90,6 +91,7 @@ export function StatsPage() {
   const funnelData = (data?.funnel ?? []).map((f) => ({
     name: f.status_name,
     Applications: f.count,
+    pct: f.pct,
     color: f.status_color,
   }))
 
@@ -170,12 +172,26 @@ export function StatsPage() {
           <div className="space-y-8 max-w-3xl">
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <StatCard label="Shown" value={data.total} />
+              <StatCard label="Total" value={data.total} />
               <StatCard label="Active" value={data.totalActive} />
               <StatCard label="Archived" value={data.totalArchived} />
               <StatCard
-                label="Response rate"
+                label="Interview rate"
                 value={data.responseRate !== null ? `${data.responseRate}%` : '—'}
+              />
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 -mt-5">
+              <StatCard
+                label="Offer rate"
+                value={data.offerRate !== null ? `${data.offerRate}%` : '—'}
+              />
+              <StatCard
+                label="Rejection rate"
+                value={data.rejectionRate !== null ? `${data.rejectionRate}%` : '—'}
+              />
+              <StatCard
+                label="Still active"
+                value={data.total > 0 ? `${Math.round((data.totalActive / (data.total + data.totalArchived)) * 100)}%` : '—'}
               />
             </div>
 
@@ -186,7 +202,7 @@ export function StatsPage() {
                 <BarChart
                   data={funnelData}
                   layout="vertical"
-                  margin={{ top: 0, right: 24, bottom: 0, left: 80 }}
+                  margin={{ top: 0, right: 52, bottom: 0, left: 80 }}
                   barSize={18}
                 >
                   <XAxis
@@ -212,6 +228,13 @@ export function StatsPage() {
                     {funnelData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
+                    <LabelList
+                      dataKey="pct"
+                      position="right"
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      formatter={(v: any) => (v > 0 ? `${v}%` : '')}
+                      style={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                    />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>

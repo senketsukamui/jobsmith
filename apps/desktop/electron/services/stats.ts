@@ -12,12 +12,22 @@ export interface StatsResult {
   total: number
   totalActive: number
   totalArchived: number
-  responseRate: number | null
-  funnel: { status_id: string; status_name: string; status_color: string; display_order: number; count: number }[]
+  responseRate: number | null      // % that ever reached interview or later
+  offerRate: number | null         // % that ever reached offer/hired
+  rejectionRate: number | null     // % that ever hit a rejection status
+  funnel: { status_id: string; status_name: string; status_color: string; display_order: number; count: number; pct: number }[]
   bySource: Record<string, number>
   weeklyBuckets: { week: string; count: number }[]
   avgDaysToRejection: number | null
   avgDaysToFirstInterview: number | null
+}
+
+const INTERVIEW_KW = ['interview', 'screen', 'phone', 'technical', 'take-home', 'takehome', 'assessment', 'offer', 'hired', 'accepted']
+const OFFER_KW = ['offer', 'hired', 'accepted']
+const REJECTION_KW = ['reject', 'declined', 'withdrawn', 'no offer']
+
+function matchesAny(name: string, keywords: string[]) {
+  return keywords.some((kw) => name.includes(kw))
 }
 
 function isoWeek(ts: number): string {
@@ -57,7 +67,6 @@ export async function getStats(input: StatsInput = {}): Promise<StatsResult> {
   const totalActive = allApps.filter((a) => a.archived === 0).length
   const totalArchived = allApps.length - totalActive
 
-  // base set respects includeArchived + source filters
   const baseApps = allApps.filter((a) => {
     if (!includeArchived && a.archived !== 0) return false
     if (sourceFilter && a.source !== sourceFilter) return false
@@ -65,27 +74,25 @@ export async function getStats(input: StatsInput = {}): Promise<StatsResult> {
   })
 
   const total = baseApps.length
+  const baseAppIds = new Set(baseApps.map((a) => a.id))
 
   const allStatuses = await db.select().from(statuses).orderBy(asc(statuses.display_order))
-  const defaultStatus = allStatuses.find((s) => s.is_default_new === 1)
-
-  const responseRate: number | null = (() => {
-    if (total === 0 || !defaultStatus) return null
-    const responded = baseApps.filter((a) => a.current_status_id !== defaultStatus.id).length
-    return Math.round((responded / total) * 100)
-  })()
 
   const statusCountMap: Record<string, number> = {}
   for (const a of baseApps) {
     statusCountMap[a.current_status_id] = (statusCountMap[a.current_status_id] ?? 0) + 1
   }
-  const funnel = allStatuses.map((s) => ({
-    status_id: s.id,
-    status_name: s.name,
-    status_color: s.color,
-    display_order: s.display_order,
-    count: statusCountMap[s.id] ?? 0,
-  }))
+  const funnel = allStatuses.map((s) => {
+    const count = statusCountMap[s.id] ?? 0
+    return {
+      status_id: s.id,
+      status_name: s.name,
+      status_color: s.color,
+      display_order: s.display_order,
+      count,
+      pct: total === 0 ? 0 : Math.round((count / total) * 100),
+    }
+  })
 
   const bySource: Record<string, number> = {}
   for (const a of baseApps) {
@@ -106,8 +113,6 @@ export async function getStats(input: StatsInput = {}): Promise<StatsResult> {
   }
   const weeklyBuckets = weekKeys.map((week) => ({ week, count: weekCountMap[week] ?? 0 }))
 
-  const baseAppIds = new Set(baseApps.map((a) => a.id))
-
   const historyRows = await db
     .select({
       application_id: application_status_history.application_id,
@@ -126,21 +131,41 @@ export async function getStats(input: StatsInput = {}): Promise<StatsResult> {
   const seenRejection = new Set<string>()
   const seenInterview = new Set<string>()
 
+  const appsReachedInterview = new Set<string>()
+  const appsReachedOffer = new Set<string>()
+  const appsRejected = new Set<string>()
+
   for (const row of historyRows) {
     if (!baseAppIds.has(row.application_id)) continue
+    const name = row.status_name.toLowerCase()
+
+    if (matchesAny(name, INTERVIEW_KW)) appsReachedInterview.add(row.application_id)
+    if (matchesAny(name, OFFER_KW)) appsReachedOffer.add(row.application_id)
+    if (matchesAny(name, REJECTION_KW)) appsRejected.add(row.application_id)
+
     const appliedAt = appAppliedAt[row.application_id]
     if (!appliedAt) continue
-    const name = row.status_name.toLowerCase()
-    if (row.is_terminal === 1 && name.includes('reject') && !seenRejection.has(row.application_id)) {
+    if (row.is_terminal === 1 && matchesAny(name, REJECTION_KW) && !seenRejection.has(row.application_id)) {
       seenRejection.add(row.application_id)
       firstRejectionDays.push((row.changed_at - appliedAt) / 86_400_000)
     }
-    if (name.includes('interview') && !seenInterview.has(row.application_id)) {
+    if (matchesAny(name, INTERVIEW_KW) && !seenInterview.has(row.application_id)) {
       seenInterview.add(row.application_id)
       firstInterviewDays.push((row.changed_at - appliedAt) / 86_400_000)
     }
   }
 
+  // Also check current status in case app has no history entries yet
+  for (const a of baseApps) {
+    const status = allStatuses.find((s) => s.id === a.current_status_id)
+    if (!status) continue
+    const name = status.name.toLowerCase()
+    if (matchesAny(name, INTERVIEW_KW)) appsReachedInterview.add(a.id)
+    if (matchesAny(name, OFFER_KW)) appsReachedOffer.add(a.id)
+    if (matchesAny(name, REJECTION_KW)) appsRejected.add(a.id)
+  }
+
+  const pct = (n: number) => (total === 0 ? null : Math.round((n / total) * 100))
   const avg = (arr: number[]) =>
     arr.length === 0 ? null : Math.round(arr.reduce((a, b) => a + b, 0) / arr.length)
 
@@ -148,7 +173,9 @@ export async function getStats(input: StatsInput = {}): Promise<StatsResult> {
     total,
     totalActive,
     totalArchived,
-    responseRate,
+    responseRate: pct(appsReachedInterview.size),
+    offerRate: pct(appsReachedOffer.size),
+    rejectionRate: pct(appsRejected.size),
     funnel,
     bySource,
     weeklyBuckets,
