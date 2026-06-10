@@ -57,6 +57,14 @@ function ParseReviewModal({ applicationId, parsed, onClose }: {
   const queryClient = useQueryClient()
   const { toast } = useToast()
   const [role, setRole] = useState(parsed.role_title)
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
   const [desc, setDesc] = useState(parsed.job_description)
   const [error, setError] = useState<string | null>(null)
 
@@ -180,6 +188,16 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
     onSuccess: (data) => { setParseError(null); setParseResult(data) },
     onError: (err) => setParseError(err.message),
   })
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      if (editing) { setEditing(false) } else { onClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [editing, onClose])
 
   const app = appQuery.data
   const coverLetters = coverLettersQuery.data ?? []

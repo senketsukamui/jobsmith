@@ -10,6 +10,15 @@ interface CoverLetterModalProps {
 
 export function CoverLetterModal({ applicationId, initialCvId, onClose }: CoverLetterModalProps) {
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.stopPropagation(); onClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
   const cvsQuery = trpc.cvs.list.useQuery()
   const cvs = cvsQuery.data ?? []
   const defaultCv = cvs.find((c) => c.is_default === 1)

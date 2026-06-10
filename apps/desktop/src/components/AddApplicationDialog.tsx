@@ -39,6 +39,16 @@ export function AddApplicationDialog() {
   const [cvId, setCvId] = useState<string>('')
   const [error, setError] = useState('')
 
+  useEffect(() => {
+    if (!isAddDialogOpen) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { e.stopPropagation(); handleClose() }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAddDialogOpen])
+
   const cvsQuery = trpc.cvs.list.useQuery()
   const cvs = cvsQuery.data ?? []
 
