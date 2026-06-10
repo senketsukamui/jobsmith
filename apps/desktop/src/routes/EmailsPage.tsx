@@ -116,21 +116,23 @@ function EmailCard({ email, statuses, onDone }: {
             <span className="font-medium">{linkedApp.company.name} — {linkedApp.role_title}</span>
           </div>
         )}
-        {!linkedApp && !showLink && (
+        {!linkedApp && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">No matched application</span>
-            <button
-              type="button"
-              onClick={() => setShowLink(true)}
-              className="text-primary hover:underline"
-            >
-              Link manually
-            </button>
+            {!showLink && (
+              <button
+                type="button"
+                onClick={() => setShowLink(true)}
+                className="text-primary hover:underline"
+              >
+                Link manually
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Link picker */}
+      {/* Link picker — shown below the label, not replacing it */}
       {!linkedApp && showLink && (
         <div className="flex gap-2 items-center">
           <select
@@ -141,7 +143,7 @@ function EmailCard({ email, statuses, onDone }: {
             <option value="">Select application…</option>
             {apps.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.company.name} — {a.role_title} @ {a.company.name}
+                {a.company.name} — {a.role_title}
               </option>
             ))}
           </select>
