@@ -222,9 +222,11 @@ const emailsRouter = router({
 
   scanNow: procedure.mutation(() => EmailScannerService.scanEmails()),
 
-  accept: procedure.input(z.string()).mutation(({ input }) =>
-    EmailScannerService.acceptEmailSuggestion(input)
-  ),
+  accept: procedure
+    .input(z.object({ id: z.string(), statusId: z.string().optional() }))
+    .mutation(({ input }) =>
+      EmailScannerService.acceptEmailSuggestion(input.id, input.statusId)
+    ),
 
   dismiss: procedure.input(z.string()).mutation(({ input }) =>
     EmailScannerService.dismissEmailSuggestion(input)

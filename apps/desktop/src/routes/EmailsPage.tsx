@@ -43,6 +43,7 @@ function EmailCard({ email, statuses, onDone }: {
   const [showLink, setShowLink] = useState(false)
   const [draft, setDraft] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [selectedStatusId, setSelectedStatusId] = useState<string>(email.suggested_status_id ?? '')
   const draftMutation = trpc.emails.draftReply.useMutation({
     onSuccess: (text) => setDraft(text),
   })
@@ -53,6 +54,10 @@ function EmailCard({ email, statuses, onDone }: {
   const accept = trpc.emails.accept.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); onDone() },
   })
+
+  function handleAccept() {
+    accept.mutate({ id: email.id, statusId: selectedStatusId || undefined })
+  }
   const dismiss = trpc.emails.dismiss.useMutation({
     onSuccess: () => { queryClient.invalidateQueries(); onDone() },
   })
@@ -60,7 +65,6 @@ function EmailCard({ email, statuses, onDone }: {
     onSuccess: () => queryClient.invalidateQueries(),
   })
 
-  const suggestedStatus = statuses.find((s) => s.id === email.suggested_status_id)
   const linkedApp = apps.find((a) => a.id === email.linked_application_id)
   const classLabel = email.classification ? CLASSIFICATION_LABELS[email.classification] : '—'
   const classColor = email.classification ? CLASSIFICATION_COLORS[email.classification] : '#9ca3af'
@@ -97,19 +101,22 @@ function EmailCard({ email, statuses, onDone }: {
         </p>
       )}
 
-      {/* Suggested status + linked app */}
-      <div className="flex flex-wrap gap-3 text-xs">
-        {suggestedStatus && (
-          <div className="flex items-center gap-1.5">
-            <span className="text-muted-foreground">Suggested status:</span>
-            <span
-              className="px-1.5 py-0.5 rounded-full text-white text-[11px] font-medium"
-              style={{ backgroundColor: suggestedStatus.color }}
-            >
-              {suggestedStatus.name}
-            </span>
-          </div>
-        )}
+      {/* Status selector + linked app */}
+      <div className="flex flex-wrap gap-3 text-xs items-center">
+        <div className="flex items-center gap-1.5">
+          <span className="text-muted-foreground">Status:</span>
+          <select
+            value={selectedStatusId}
+            onChange={(e) => setSelectedStatusId(e.target.value)}
+            className="h-6 rounded border border-input bg-transparent px-1.5 text-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            style={selectedStatusId ? { color: statuses.find(s => s.id === selectedStatusId)?.color } : undefined}
+          >
+            <option value="">Pick a status…</option>
+            {statuses.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
         {linkedApp && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">Application:</span>
@@ -172,10 +179,10 @@ function EmailCard({ email, statuses, onDone }: {
       <div className="flex flex-wrap gap-2 pt-1">
         <button
           type="button"
-          onClick={() => accept.mutate(email.id)}
-          disabled={accept.isLoading || !email.linked_application_id || !email.suggested_status_id}
+          onClick={handleAccept}
+          disabled={accept.isLoading || !email.linked_application_id || !selectedStatusId}
           className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
-          title={!email.linked_application_id ? 'Link to an application first' : !email.suggested_status_id ? 'No status suggestion' : ''}
+          title={!email.linked_application_id ? 'Link to an application first' : !selectedStatusId ? 'Pick a status first' : ''}
         >
           {accept.isLoading ? 'Applying…' : 'Accept'}
         </button>

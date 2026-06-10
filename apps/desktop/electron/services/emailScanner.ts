@@ -426,18 +426,20 @@ export async function getRecentEmails(limit = 50) {
     .limit(limit)
 }
 
-export async function acceptEmailSuggestion(id: string): Promise<void> {
+export async function acceptEmailSuggestion(id: string, statusId?: string): Promise<void> {
   const db = getDb()
   const [email] = await db.select().from(emails).where(eq(emails.id, id)).limit(1)
   if (!email) return
 
-  await db.update(emails).set({ user_action: 'accepted' }).where(eq(emails.id, id))
+  const resolvedStatusId = statusId ?? email.suggested_status_id ?? null
 
-  if (email.linked_application_id && email.suggested_status_id) {
+  await db.update(emails).set({ user_action: 'accepted', suggested_status_id: resolvedStatusId }).where(eq(emails.id, id))
+
+  if (email.linked_application_id && resolvedStatusId) {
     const { changeStatus } = await import('./applications')
     await changeStatus({
       id: email.linked_application_id,
-      status_id: email.suggested_status_id,
+      status_id: resolvedStatusId,
       note: `Accepted from email: ${email.subject ?? ''}`,
       source: 'email',
     })
