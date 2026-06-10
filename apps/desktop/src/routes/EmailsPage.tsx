@@ -4,6 +4,15 @@ import { trpc } from '@/lib/trpc'
 import type { Email } from '@jobsmith/shared'
 import { useToast } from '@/components/Toast'
 
+function decodeHtml(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    return doc.documentElement.textContent ?? html
+  } catch {
+    return html
+  }
+}
+
 const CLASSIFICATION_LABELS: Record<string, string> = {
   acknowledgment: 'Acknowledgment',
   rejection: 'Rejection',
@@ -84,7 +93,7 @@ function EmailCard({ email, statuses, onDone }: {
       {/* Snippet */}
       {email.body_snippet && (
         <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
-          {email.body_snippet}
+          {decodeHtml(email.body_snippet)}
         </p>
       )}
 
@@ -107,12 +116,12 @@ function EmailCard({ email, statuses, onDone }: {
             <span className="font-medium">{linkedApp.company.name} — {linkedApp.role_title}</span>
           </div>
         )}
-        {!linkedApp && (
+        {!linkedApp && !showLink && (
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">No matched application</span>
             <button
               type="button"
-              onClick={() => setShowLink((v) => !v)}
+              onClick={() => setShowLink(true)}
               className="text-primary hover:underline"
             >
               Link manually
@@ -122,8 +131,8 @@ function EmailCard({ email, statuses, onDone }: {
       </div>
 
       {/* Link picker */}
-      {showLink && (
-        <div className="flex gap-2">
+      {!linkedApp && showLink && (
+        <div className="flex gap-2 items-center">
           <select
             value={linkAppId}
             onChange={(e) => setLinkAppId(e.target.value)}
@@ -132,7 +141,7 @@ function EmailCard({ email, statuses, onDone }: {
             <option value="">Select application…</option>
             {apps.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.company.name} — {a.role_title}
+                {a.company.name} — {a.role_title} @ {a.company.name}
               </option>
             ))}
           </select>
@@ -145,7 +154,14 @@ function EmailCard({ email, statuses, onDone }: {
             }}
             className="h-8 px-3 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            Link
+            {link.isLoading ? '…' : 'Link'}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setShowLink(false); setLinkAppId('') }}
+            className="text-xs text-muted-foreground hover:text-foreground"
+          >
+            Cancel
           </button>
         </div>
       )}
