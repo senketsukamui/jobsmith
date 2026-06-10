@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ipcLink } from 'electron-trpc/renderer'
 import { trpc } from '@/lib/trpc'
+import { useUiStore } from '@/stores/ui'
 import { Sidebar } from '@/components/Sidebar'
 import { ApplicationsPage } from '@/routes/ApplicationsPage'
 import { EmailsPage } from '@/routes/EmailsPage'
@@ -17,8 +18,21 @@ function AppInner() {
   const settingsQuery = trpc.settings.getAll.useQuery()
   const onboardingDone = settingsQuery.data?.onboarding_done === '1'
   const [wizardDismissed, setWizardDismissed] = useState(false)
+  const { openAddDialog } = useUiStore()
 
   const showWizard = !settingsQuery.isLoading && !onboardingDone && !wizardDismissed
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        setPage('applications')
+        openAddDialog()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openAddDialog])
 
   return (
     <div className="flex h-screen overflow-hidden">

@@ -112,6 +112,7 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
   const { toast } = useToast()
   const appQuery = trpc.applications.get.useQuery(applicationId)
   const coverLettersQuery = trpc.coverLetters.list.useQuery(applicationId)
+  const historyQuery = trpc.applications.history.useQuery(applicationId)
 
   const [editing, setEditing] = useState(false)
   const [showCoverLetterModal, setShowCoverLetterModal] = useState(false)
@@ -144,6 +145,7 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
 
   const app = appQuery.data
   const coverLetters = coverLettersQuery.data ?? []
+  const history = historyQuery.data ?? []
 
   if (appQuery.isLoading) return <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Loading…</div>
   if (!app) return <div className="flex items-center justify-center h-full text-muted-foreground text-sm">Application not found.</div>
@@ -275,6 +277,25 @@ export function ApplicationDetailPanel({ applicationId, statuses, onClose }: App
                 <div className="space-y-1.5">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Notes</p>
                   <p className="text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">{app.notes}</p>
+                </div>
+              )}
+
+              {/* Timeline */}
+              {history.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Timeline</p>
+                  <div className="space-y-1.5">
+                    {history.map((entry) => (
+                      <div key={entry.id} className="flex items-start gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full mt-0.5 shrink-0" style={{ backgroundColor: entry.status.color }} />
+                        <div className="min-w-0 flex-1">
+                          <span className="font-medium">{entry.status.name}</span>
+                          {entry.note && <span className="text-muted-foreground"> · {entry.note}</span>}
+                        </div>
+                        <span className="text-muted-foreground whitespace-nowrap">{formatDate(entry.changed_at)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
