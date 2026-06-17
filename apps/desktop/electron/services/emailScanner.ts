@@ -4,24 +4,16 @@ import path from 'path'
 import { uuidv7 } from 'uuidv7'
 import { getDb } from '../db/client'
 import { emails, companies, applications, statuses } from '../db/schema'
-import { getGmailClient, getLastHistoryId, setLastHistoryId } from './gmail'
-import { getSetting } from './settings'
+import { getGmailClient } from './gmail'
+import { getSetting, setSetting } from './settings'
 import { streamGenerate } from './ollama'
 import type { EmailClassification } from '@jobsmith/shared'
 
 const PROMPT_PATH = path.join(__dirname, '../services/llm/prompts/email-classification.md')
 
 const AUTO_APPLY_THRESHOLD = 0.65
-
-const CANDIDATE_KEYWORDS = [
-  'application', 'applied', 'applying',
-  'thank you for applying', 'thanks for applying',
-  'thank you for your application', 'thanks for your application',
-  'thank you for considering', 'thanks for considering',
-  'interview', 'next steps', 'unfortunately', 'we regret', 'not moving forward',
-  'position has been filled', 'offer', 'congratulations', 'hiring decision',
-  'follow up', 'recruiter', 'talent acquisition',
-]
+const COMPANY_BATCH_SIZE = 15
+const DEFAULT_LOOKBACK_MS = 90 * 24 * 60 * 60 * 1000
 
 // ─── Levenshtein for fuzzy matching ──────────────────────────────────────────
 
@@ -40,17 +32,51 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n]
 }
 
-// ─── Candidate filter ─────────────────────────────────────────────────────────
+// ─── Gmail search helpers ─────────────────────────────────────────────────────
 
-function isCandidate(
-  subject: string,
-  snippet: string,
-  fromDomain: string,
-  companyDomains: string[]
-): boolean {
-  if (companyDomains.some((d) => d && fromDomain.endsWith(d))) return true
-  const text = `${subject} ${snippet}`.toLowerCase()
-  return CANDIDATE_KEYWORDS.some((kw) => text.includes(kw))
+function buildCompanySearchQueries(
+  companyList: { name: string; website: string | null }[],
+  sinceMs: number
+): string[] {
+  const afterDate = new Date(sinceMs).toISOString().slice(0, 10).replace(/-/g, '/')
+  const queries: string[] = []
+  for (let i = 0; i < companyList.length; i += COMPANY_BATCH_SIZE) {
+    const batch = companyList.slice(i, i + COMPANY_BATCH_SIZE)
+    const nameParts = batch.map((c) => `"${c.name.replace(/"/g, '')}"`)
+    const domainParts = batch
+      .map((c) => {
+        try { return `from:${new URL(c.website ?? '').hostname.replace('www.', '')}` } catch { return '' }
+      })
+      .filter(Boolean)
+    const combined = [...nameParts, ...domainParts].join(' OR ')
+    queries.push(`(${combined}) after:${afterDate}`)
+  }
+  return queries
+}
+
+async function fetchMessageIdsBySearch(
+  gmail: Awaited<ReturnType<typeof getGmailClient>>,
+  queries: string[]
+): Promise<string[]> {
+  const allIds = new Set<string>()
+  for (const q of queries) {
+    console.log(`[emailScanner] search query: ${q}`)
+    let pageToken: string | undefined
+    do {
+      const resp = await gmail.users.messages.list({
+        userId: 'me',
+        q,
+        maxResults: 100,
+        pageToken,
+      })
+      for (const msg of resp.data.messages ?? []) {
+        if (msg.id) allIds.add(msg.id)
+      }
+      pageToken = resp.data.nextPageToken ?? undefined
+    } while (pageToken)
+  }
+  console.log(`[emailScanner] search returned ${allIds.size} message ID(s) across ${queries.length} query batch(es)`)
+  return [...allIds]
 }
 
 // ─── LLM classification ───────────────────────────────────────────────────────
@@ -203,61 +229,21 @@ export async function scanEmails(): Promise<ScanResult> {
   console.log('[emailScanner] scanEmails started')
   const gmail = await getGmailClient()
 
-  // Collect known company domains for candidate filtering
-  const allCompanies = await db.select({ website: companies.website }).from(companies)
-  const companyDomains = allCompanies
-    .map((c) => {
-      try { return new URL(c.website ?? '').hostname.replace('www.', '') } catch { return '' }
-    })
-    .filter(Boolean)
-
-  // Fetch new messages via history API or initial load
-  const lastHistoryId = await getLastHistoryId()
-  let messageIds: string[] = []
-  let newHistoryId: string | undefined
-
-  console.log(`[emailScanner] lastHistoryId=${lastHistoryId}`)
-
-  if (lastHistoryId) {
-    try {
-      const histResp = await gmail.users.history.list({
-        userId: 'me',
-        startHistoryId: lastHistoryId,
-        historyTypes: ['messageAdded'],
-      })
-      newHistoryId = histResp.data.historyId ?? undefined
-      for (const record of histResp.data.history ?? []) {
-        for (const added of record.messagesAdded ?? []) {
-          if (added.message?.id) messageIds.push(added.message.id)
-        }
-      }
-      console.log(`[emailScanner] history API returned ${messageIds.length} new message(s), newHistoryId=${newHistoryId}`)
-    } catch (err) {
-      console.warn('[emailScanner] history API failed, will fallback to list:', err)
-      messageIds = []
-    }
+  // Get all tracked companies for search
+  const allCompanies = await db.select({ name: companies.name, website: companies.website }).from(companies)
+  if (allCompanies.length === 0) {
+    console.log('[emailScanner] no companies tracked, skipping scan')
+    return { scanned: 0, newMatches: 0, autoApplied: 0 }
   }
 
-  // Fallback: fetch last 50 messages
-  if (messageIds.length === 0 && !lastHistoryId) {
-    console.log('[emailScanner] no lastHistoryId, fetching last 50 messages')
-    const listResp = await gmail.users.messages.list({ userId: 'me', maxResults: 50 })
-    messageIds = (listResp.data.messages ?? []).map((m) => m.id ?? '').filter(Boolean)
-    // Capture profile historyId for future delta queries
-    const profile = await gmail.users.getProfile({ userId: 'me' })
-    newHistoryId = profile.data.historyId ?? undefined
-    console.log(`[emailScanner] fetched ${messageIds.length} messages, newHistoryId=${newHistoryId}`)
-  }
+  // Determine lookback window
+  const lastScanAtStr = await getSetting('gmail_last_scan_at')
+  const sinceMs = lastScanAtStr ? parseInt(lastScanAtStr) : Date.now() - DEFAULT_LOOKBACK_MS
+  console.log(`[emailScanner] scanning since ${new Date(sinceMs).toISOString()} for ${allCompanies.length} company(s)`)
 
-  // Also fallback when history expired (got 0 from history but had a lastHistoryId)
-  if (messageIds.length === 0 && lastHistoryId) {
-    console.log('[emailScanner] history returned 0 messages (may be up-to-date or expired), fetching last 50 as fallback')
-    const listResp = await gmail.users.messages.list({ userId: 'me', maxResults: 50 })
-    messageIds = (listResp.data.messages ?? []).map((m) => m.id ?? '').filter(Boolean)
-    const profile = await gmail.users.getProfile({ userId: 'me' })
-    newHistoryId = profile.data.historyId ?? undefined
-    console.log(`[emailScanner] fallback fetched ${messageIds.length} messages`)
-  }
+  // Search Gmail for emails mentioning tracked companies
+  const queries = buildCompanySearchQueries(allCompanies, sinceMs)
+  const messageIds = await fetchMessageIdsBySearch(gmail, queries)
 
   let scanned = 0
   let newMatches = 0
@@ -304,11 +290,7 @@ export async function scanEmails(): Promise<ScanResult> {
     }
 
     scanned++
-    const fromDomain = raw.fromAddress.split('@')[1] ?? ''
-    const candidate = isCandidate(raw.subject, raw.snippet, fromDomain, companyDomains)
-    console.log(`[emailScanner] msg ${msgId}: subject="${raw.subject}" from="${raw.fromAddress}" candidate=${candidate}`)
-
-    if (!candidate) continue
+    console.log(`[emailScanner] msg ${msgId}: subject="${raw.subject}" from="${raw.fromAddress}"`)
 
     // Run LLM classification
     const classification = await classifyEmail({
@@ -399,10 +381,8 @@ export async function scanEmails(): Promise<ScanResult> {
     })
   }
 
-  if (newHistoryId) {
-    await setLastHistoryId(newHistoryId)
-    console.log(`[emailScanner] saved newHistoryId=${newHistoryId}`)
-  }
+  await setSetting('gmail_last_scan_at', Date.now().toString())
+  console.log('[emailScanner] updated gmail_last_scan_at')
 
   console.log(`[emailScanner] done: scanned=${scanned} autoApplied=${autoApplied} newMatches=${newMatches}`)
   return { scanned, newMatches, autoApplied }
